@@ -3,4 +3,5 @@ module com.sterndu.DataTransfer {
 
 	requires transitive Encryption;
 	requires transitive com.sterndu.Util;
+	requires transitive com.sterndu.MultiCore;
 }

@@ -15,7 +15,7 @@ public class SecureConnectionUtil {
 
 		protected DiffieHellmanAES dHAES;
 
-		protected ClientConnection() {}
+		protected ClientConnection() {} 
 
 		public ClientConnection(InetAddress address, int port) throws IOException {
 			super(address, port);

@@ -1,31 +1,15 @@
 package com.sterndu.data.transfer;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EmptyStackException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Vector;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import com.sterndu.util.Updater;
-import com.sterndu.util.Util;
+import java.io.*;
+import java.net.*;
+import java.nio.*;
+import java.security.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import java.util.function.*;
+import com.sterndu.multicore.Updater;
+import com.sterndu.util.*;
 import com.sterndu.util.interfaces.ThrowingRunnable;
 
 public class ConnectionUtil {
@@ -33,7 +17,7 @@ public class ConnectionUtil {
 	public static class ClientConnection extends Socket {
 
 		protected boolean host = false;
-
+		protected boolean closing = false, recv = false;
 		protected boolean initialized = true;
 		protected Runnable shutdownHook=()->{};
 
@@ -68,41 +52,6 @@ public class ConnectionUtil {
 			init(this.host);
 		}
 
-		@Override
-		public synchronized void close() throws IOException,SocketException {
-			synchronized (sendLock) {
-				synchronized (recLock) {
-					sendClose();
-					shutdownOutput();
-					shutdownInput();
-					Updater.getInstance().remove("CheckForMsgs" + hashCode());
-					shutdownHook.run();
-					super.close();
-				}
-			}
-		}
-
-		public final BiConsumer<Byte,byte[]> getHandle(byte type) {
-			return hasHandle(type)?handles.get(type).getValue():null;
-		}
-
-		public int getMessageCount() { return recvVector.size(); }
-
-		public Paket getMessageFromBuffer() {
-			if (recvVector.isEmpty()) {
-				throw new EmptyStackException();
-			}
-			return recvVector.remove(0);
-		}
-
-		public final boolean hasHandle(byte type) {
-			return handles.containsKey(type);
-		}
-
-		public boolean hasMessage() {
-			return !recvVector.isEmpty();
-		}
-
 		protected byte[] implRecieveData(byte type, byte[] data) {
 			return data;
 		}
@@ -117,17 +66,15 @@ public class ConnectionUtil {
 				setHandle((byte) -1, (type, data) -> {
 					try {
 						close();
-					} catch (final IOException e) {
+					} catch (IOException e) {
 						e.printStackTrace();
 					}
 				});
 				setHandle((byte) 0, (type, data) -> {
-					if (last_msg != null) {
-						try {
-							sendData(last_msg.type(), last_msg.data());
-						} catch (final SocketException e) {
-							e.printStackTrace();
-						}
+					if (last_msg != null) try {
+						sendData(last_msg.type(), last_msg.data());
+					} catch (final SocketException e) {
+						e.printStackTrace();
 					}
 				});
 				setHandle((byte) -128, (type, data) -> {
@@ -141,17 +88,12 @@ public class ConnectionUtil {
 				e.printStackTrace();
 			}
 			Updater.getInstance().add((ThrowingRunnable) () -> {
-				if (!isClosed() && getInputStream().available() > 0) {
-					try {
-						final Paket data = recieveData().get();
-						if (handles.containsKey(data.type())) {
-							getHandle(data.type()).accept(data.type(), data.data());
-						} else {
-							recvVector.add(data);
-						}
-					} catch (final CancellationException e) {
+				if (!isClosed() && getInputStream().available() > 0) try {
+					final Paket data = recieveData().get();
+					if (handles.containsKey(data.type())) getHandle(data.type()).accept(data.type(), data.data());
+					else recvVector.add(data);
+				} catch (final CancellationException e) {
 
-					}
 				}
 				if (delayed_send.size() > 0 && initialized) {
 					final Paket data = delayed_send.remove(0);
@@ -173,7 +115,7 @@ public class ConnectionUtil {
 						final byte[] data = new byte[length];
 						if (Util.readXBytes(data,getInputStream(),length) && Util.readXBytes(b,getInputStream(),b.length) && Arrays.equals(b,md.digest(data))) {
 							paket = new Paket(type, data);
-							System.out.println(type + "r[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
+							System.err.println(type + "r[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
 									+ Arrays.toString(b));
 							break sync;
 						}
@@ -193,6 +135,40 @@ public class ConnectionUtil {
 			//type byte; length int; data byte[]; hash byte[];
 		}
 
+		@Override
+		public void close() throws IOException, SocketException {
+			synchronized (recLock) {
+				synchronized (sendLock) {
+					if (!isClosed()) {
+						shutdownOutput();
+						shutdownInput();
+						Updater.getInstance().remove("CheckForMsgs" + hashCode());
+						shutdownHook.run();
+						super.close();
+					}
+				}
+			}
+		}
+
+		public final BiConsumer<Byte,byte[]> getHandle(byte type) {
+			return hasHandle(type)?handles.get(type).getValue():null;
+		}
+
+		public int getMessageCount() { return recvVector.size(); }
+
+		public Paket getMessageFromBuffer() {
+			if (recvVector.isEmpty()) throw new EmptyStackException();
+			return recvVector.remove(0);
+		}
+
+		public final boolean hasHandle(byte type) {
+			return handles.containsKey(type);
+		}
+
+		public boolean hasMessage() {
+			return !recvVector.isEmpty();
+		}
+
 		public void removeLastSentMessage() {
 			last_msg=null;
 		}
@@ -206,41 +182,36 @@ public class ConnectionUtil {
 		}
 
 		public final void sendData(byte type, byte[] data) throws SocketException {
-			if (!initialized) {
+			if (!initialized) try {
+				final Class<?> caller = Class.forName(Thread.currentThread().getStackTrace()[2].getClassName());
+				System.out.println(caller);
+				caller.asSubclass(ClientConnection.class);
+			} catch (ClassNotFoundException | ClassCastException e) {
+				delayed_send.add(new Paket(type, data));
+				return;
+			}
+			if (!isClosed()) synchronized (sendLock) {
+				final byte[] modified_data = implSendData(type, data);
+				final byte[] hash = md.digest(modified_data);
+				final byte[] length_bytes = ByteBuffer.allocate(4).putInt(modified_data.length).array();
 				try {
-					final Class<?> caller = Class.forName(Thread.currentThread().getStackTrace()[2].getClassName());
-					System.out.println(caller);
-					caller.asSubclass(ClientConnection.class);
-				} catch (ClassNotFoundException | ClassCastException e) {
+					final OutputStream os = getOutputStream();
+					os.write(type);
+					os.write(length_bytes);
+					os.write(modified_data);
+					os.write(hash);
+					System.err.println(
+							type + "s[length_bytes:" + Arrays.toString(length_bytes) + ", length:"
+									+ modified_data.length
+									+ ",data:" + Arrays.toString(modified_data) + ",hash:" + Arrays.toString(hash));
+				} catch (final IOException e) {
+					e.printStackTrace();
 					delayed_send.add(new Paket(type, data));
 					return;
 				}
+				last_msg = new Paket(type, data);
 			}
-			if (!isClosed()) {
-				synchronized (sendLock) {
-					final byte[] modified_data = implSendData(type, data);
-					final byte[] hash = md.digest(modified_data);
-					final byte[] length_bytes = ByteBuffer.allocate(4).putInt(modified_data.length).array();
-					try {
-						final OutputStream os = getOutputStream();
-						os.write(type);
-						os.write(length_bytes);
-						os.write(modified_data);
-						os.write(hash);
-						System.out.println(
-								type + "s[length_bytes:" + Arrays.toString(length_bytes) + ", length:"
-										+ modified_data.length
-										+ ",data:" + Arrays.toString(modified_data) + ",hash:" + Arrays.toString(hash));
-					} catch (final IOException e) {
-						e.printStackTrace();
-						delayed_send.add(new Paket(type, data));
-						return;
-					}
-					last_msg = new Paket(type, data);
-				}
-			} else {
-				throw new SocketException("Soket closed!");
-			}
+			else throw new SocketException("Soket closed!");
 
 		}
 
@@ -253,9 +224,7 @@ public class ConnectionUtil {
 				} else if (handles.get(type).getKey().equals(caller)) {
 					handles.put(type, Map.entry(caller, handle));
 					return true;
-				} else {
-					return false;
-				}
+				} else return false;
 			} catch (final Exception e) {
 				e.printStackTrace();
 				return false;
@@ -330,32 +299,25 @@ public class ConnectionUtil {
 		final HostConnection hc = new HostConnection(port);
 		if (method != null) {
 			final AtomicBoolean cTACL = new AtomicBoolean(closeThreadAfterConnectionLost);
-			if (parallelConnections) {
-				for (int i = 0; i < connections; i++) {
-					final ClientConnection c = (ClientConnection) hc.accept();
-					if (c == null) {
-						continue;
-					}
-					final Thread t = new Thread((Runnable) () -> {
-						method.accept(c, hc);
-					}, i + "-Host");
-					t.setDaemon(false);
-					t.start();
-				}
-			} else {
-				do {
-					final ClientConnection c = (ClientConnection) hc.accept();
-					if (c == null) {
-						continue;
-					}
-					final Thread t2 = new Thread(() -> {
-						method.accept(c, hc);
-					}, "0-Host");
-					t2.setDaemon(false);
-					t2.start();
-
-				} while (!cTACL.get());
+			if (parallelConnections) for (int i = 0; i < connections; i++) {
+				final ClientConnection c = (ClientConnection) hc.accept();
+				if (c == null) continue;
+				final Thread t = new Thread((Runnable) () -> {
+					method.accept(c, hc);
+				}, i + "-Host");
+				t.setDaemon(false);
+				t.start();
 			}
+			else do {
+				final ClientConnection c = (ClientConnection) hc.accept();
+				if (c == null) continue;
+				final Thread t2 = new Thread(() -> {
+					method.accept(c, hc);
+				}, "0-Host");
+				t2.setDaemon(false);
+				t2.start();
+
+			} while (!cTACL.get());
 		}
 		return hc;
 	}
