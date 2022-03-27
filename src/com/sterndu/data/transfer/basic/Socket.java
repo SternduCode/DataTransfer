@@ -114,16 +114,21 @@ public class Socket extends DatatransferSocket {
 
 	@Override
 	public void close() throws IOException, SocketException {
-		synchronized (recLock) {
-			synchronized (sendLock) {
-				if (!isClosed()) {
-					shutdownOutput();
-					shutdownInput();
-					Updater.getInstance().remove("CheckForMsgs" + hashCode());
-					shutdownHook.run();
-					super.close();
+		try {
+			synchronized (recLock) {
+				synchronized (sendLock) {
+					if (!isClosed()) {
+						shutdownOutput();
+						shutdownInput();
+						Updater.getInstance().remove("CheckForMsgs" + hashCode());
+						shutdownHook.run();
+						super.close();
+					}
 				}
 			}
+		} catch (NullPointerException e) {
+			Updater.getInstance().remove("CheckForMsgs" + hashCode());
+			super.close();
 		}
 	}
 
