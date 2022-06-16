@@ -5,8 +5,7 @@ import java.net.*;
 import java.nio.*;
 import java.security.*;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CancellationException;
 import java.util.function.BiConsumer;
 import com.sterndu.data.transfer.*;
 import com.sterndu.multicore.Updater;
@@ -63,7 +62,7 @@ public class Socket extends DatatransferSocket {
 		}
 		Updater.getInstance().add((ThrowingRunnable) () -> {
 			if (!isClosed() && getInputStream().available() > 0) try {
-				final Packet data = recieveData().get();
+				final Packet data = recieveData();
 				if (handles.containsKey(data.type())) getHandle(data.type()).accept(data.type(), data.data());
 				else recvVector.add(data);
 			} catch (final CancellationException e) {
@@ -76,37 +75,29 @@ public class Socket extends DatatransferSocket {
 		}, "CheckForMsgs" + hashCode());
 	}
 
-	protected final FutureTask<Packet> recieveData() {
-		final AtomicReference<FutureTask<Packet>> ar = new AtomicReference<>();
-		final FutureTask<Packet> ft = new FutureTask<>(() -> {
-			Packet packet;
-			sync: synchronized (recLock) {
-				byte[] b = new byte[5];
-				if (Util.readXBytes(b, getInputStream(), b.length)) {
-					final byte type = b[0];
-					final int length = ByteBuffer.wrap(b).order(ByteOrder.BIG_ENDIAN).getInt(1);
-					b = new byte[32];
-					final byte[] data = new byte[length];
-					if (Util.readXBytes(data, getInputStream(), length)
-							&& Util.readXBytes(b, getInputStream(), b.length) && Arrays.equals(b, md.digest(data))) {
-						packet = new Packet(type, data);
-						System.err.println(type + "r[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
-								+ Arrays.toString(b));
-						break sync;
-					}
-					System.out.println(type + "f[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
+	protected final Packet recieveData() throws IOException {
+		Packet packet;
+		sync: synchronized (recLock) {
+			byte[] b = new byte[5];
+			if (Util.readXBytes(b, getInputStream(), b.length)) {
+				final byte type = b[0];
+				final int length = ByteBuffer.wrap(b).order(ByteOrder.BIG_ENDIAN).getInt(1);
+				b = new byte[32];
+				final byte[] data = new byte[length];
+				if (Util.readXBytes(data, getInputStream(), length)
+						&& Util.readXBytes(b, getInputStream(), b.length) && Arrays.equals(b, md.digest(data))) {
+					packet = new Packet(type, data);
+					System.err.println(type + "r[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
 							+ Arrays.toString(b));
+					break sync;
 				}
-				System.out.println("f" + Arrays.toString(b));
-				ar.get().cancel(false);
-				return new Packet((byte) -128, new byte[0]);
+				System.out.println(type + "f[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
+						+ Arrays.toString(b));
 			}
-			return new Packet(packet.type(), implRecieveData(packet.type(), packet.data()));
-		});
-		ar.setRelease(ft);
-		new Thread(ft).start();
-		return ft;
-
+			System.out.println("f" + Arrays.toString(b));
+			return new Packet((byte) -128, new byte[0]);
+		}
+		return new Packet(packet.type(), implRecieveData(packet.type(), packet.data()));
 		// type byte; length int; data byte[]; hash byte[];
 	}
 
