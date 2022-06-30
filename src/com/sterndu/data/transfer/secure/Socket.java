@@ -56,6 +56,7 @@ public class Socket extends com.sterndu.data.transfer.basic.Socket {
 	@Override
 	protected void init(boolean host) {
 		try {
+			this.host = host;
 			initialized = false;
 			md = MessageDigest.getInstance("SHA3-256");
 			dh = new DiffieHellman();
