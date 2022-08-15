@@ -6,7 +6,7 @@ import java.nio.*;
 import java.security.*;
 import java.util.*;
 import java.util.concurrent.CancellationException;
-import java.util.function.BiConsumer;
+import java.util.function.*;
 import com.sterndu.data.transfer.*;
 import com.sterndu.multicore.Updater;
 import com.sterndu.util.Util;
@@ -87,14 +87,17 @@ public class Socket extends DatatransferSocket {
 				if (Util.readXBytes(data, getInputStream(), length)
 						&& Util.readXBytes(b, getInputStream(), b.length) && Arrays.equals(b, md.digest(data))) {
 					packet = new Packet(type, data);
-					System.err.println(type + "r[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
-							+ Arrays.toString(b));
+					if (System.getProperty("debug").equals("true"))
+						System.err.println(type + "r[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
+								+ Arrays.toString(b));
 					break sync;
 				}
-				System.out.println(type + "f[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
-						+ Arrays.toString(b));
+				if (System.getProperty("debug").equals("true"))
+					System.out.println(type + "f[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
+							+ Arrays.toString(b));
 			}
-			System.out.println("f" + Arrays.toString(b));
+			if (System.getProperty("debug").equals("true"))
+				System.out.println("f" + Arrays.toString(b));
 			return new Packet((byte) -128, new byte[0]);
 		}
 		return new Packet(packet.type(), implRecieveData(packet.type(), packet.data()));
@@ -109,10 +112,10 @@ public class Socket extends DatatransferSocket {
 			synchronized (recLock) {
 				synchronized (sendLock) {
 					if (!isClosed()) {
+						shutdownHook.accept(this);
 						shutdownOutput();
 						shutdownInput();
 						Updater.getInstance().remove("CheckForMsgs" + hashCode());
-						shutdownHook.run();
 						super.close();
 					}
 				}
@@ -155,7 +158,8 @@ public class Socket extends DatatransferSocket {
 	public final void sendData(byte type, byte[] data) throws SocketException {
 		if (!initialized) try {
 			final Class<?> caller = Class.forName(Thread.currentThread().getStackTrace()[2].getClassName());
-			System.out.println(caller);
+			if (System.getProperty("debug").equals("true"))
+				System.out.println(caller);
 			caller.asSubclass(Socket.class);
 		} catch (ClassNotFoundException | ClassCastException e) {
 			delayed_send.add(new Packet(type, data));
@@ -171,10 +175,11 @@ public class Socket extends DatatransferSocket {
 				os.write(length_bytes);
 				os.write(modified_data);
 				os.write(hash);
-				System.err.println(
-						type + "s[length_bytes:" + Arrays.toString(length_bytes) + ", length:"
-								+ modified_data.length
-								+ ",data:" + Arrays.toString(modified_data) + ",hash:" + Arrays.toString(hash));
+				if (System.getProperty("debug").equals("true"))
+					System.err.println(
+							type + "s[length_bytes:" + Arrays.toString(length_bytes) + ", length:"
+									+ modified_data.length
+									+ ",data:" + Arrays.toString(modified_data) + ",hash:" + Arrays.toString(hash));
 			} catch (final IOException e) {
 				e.printStackTrace();
 				delayed_send.add(new Packet(type, data));
@@ -201,6 +206,6 @@ public class Socket extends DatatransferSocket {
 		}
 	}
 
-	public void setShutdownHook(Runnable hook) { shutdownHook = hook; }
+	public void setShutdownHook(Consumer<DatatransferSocket> hook) { shutdownHook = hook; }
 
 }

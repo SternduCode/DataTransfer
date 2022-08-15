@@ -4,12 +4,12 @@ import java.io.IOException;
 import java.net.*;
 import java.security.MessageDigest;
 import java.util.*;
-import java.util.function.BiConsumer;
+import java.util.function.*;
 
 public abstract class DatatransferSocket extends Socket {
 
 	protected boolean initialized = true;
-	protected Runnable shutdownHook = () -> {};
+	protected Consumer<DatatransferSocket> shutdownHook = s -> {};
 	protected MessageDigest md;
 	protected Object recLock = new Object(), sendLock = new Object();
 	protected Vector<Packet> recvVector = new Vector<>();
