@@ -10,9 +10,8 @@ import java.util.function.*;
 
 import com.sterndu.data.transfer.*;
 import com.sterndu.multicore.Updater;
-import com.sterndu.util.Util;
+import com.sterndu.util.*;
 import com.sterndu.util.interfaces.ThrowingRunnable;
-import com.sterndu.util.kotlin.Entry;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -250,7 +249,7 @@ public class Socket extends DatatransferSocket {
 	 * @return the handle
 	 */
 	public final BiConsumer<Byte, byte[]> getHandle(byte type) {
-		return hasHandle(type) ? handles.get(type).getValue() : null;
+		return hasHandle(type) ? handles.get(type).value() : null;
 	}
 
 	/**
@@ -363,7 +362,7 @@ public class Socket extends DatatransferSocket {
 	public final boolean setHandle(byte type, BiConsumer<Byte, byte[]> handle) {
 		try {
 			final Class<?> caller = Class.forName(Thread.currentThread().getStackTrace()[2].getClassName());
-			if (!handles.containsKey(type) || handles.get(type).getKey().equals(caller)) {
+			if (!handles.containsKey(type) || handles.get(type).key().equals(caller)) {
 				if (handle != null) {
 					if (handles.containsKey(type)) {
 						Iterator<Packet> it = recvVector.iterator();

@@ -6,7 +6,7 @@ import java.security.MessageDigest;
 import java.util.*;
 import java.util.function.*;
 
-import com.sterndu.util.kotlin.Entry;
+import com.sterndu.util.Entry;
 
 // TODO: Auto-generated Javadoc
 /**
