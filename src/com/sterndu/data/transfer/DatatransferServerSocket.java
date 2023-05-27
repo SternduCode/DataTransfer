@@ -18,10 +18,6 @@ public abstract class DatatransferServerSocket extends ServerSocket {
 		super(port, backlog, bindAddr);
 	}
 
-	public DatatransferServerSocket(SocketImpl impl) {
-		super(impl);
-	}
-
 	@Override
-	public abstract Socket accept();
+	public abstract Socket accept() throws IOException;
 }
