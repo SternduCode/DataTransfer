@@ -20,22 +20,13 @@ public class ServerSocket extends DatatransferServerSocket {
 		super(port, backlog, bindAddr);
 	}
 
-	public ServerSocket(SocketImpl impl) {
-		super(impl);
-	}
-
 	@Override
-	public Socket accept() {
-		try {
-			final Socket s = new Socket();
-			super.implAccept(s);
-			s.host = true;
-			s.init(true);
-			return s;
-		} catch (final IOException e) {
-			e.printStackTrace();
-			return null;
-		}
+	public Socket accept() throws IOException {
+		final Socket s = new Socket();
+		super.implAccept(s);
+		s.host = true;
+		s.init(true);
+		return s;
 	}
 
 }

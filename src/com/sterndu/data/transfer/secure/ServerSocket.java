@@ -19,22 +19,13 @@ public class ServerSocket extends com.sterndu.data.transfer.basic.ServerSocket {
 		super(port, backlog, bindAddr);
 	}
 
-	public ServerSocket(SocketImpl impl) {
-		super(impl);
-	}
-
 	@Override
-	public Socket accept() {
-		try {
-			Socket s = new Socket();
-			s.setHost(true);
-			super.implAccept(s);
-			s.init(true);
-			return s;
-		} catch (IOException e) {
-			e.printStackTrace();
-			return null;
-		}
+	public Socket accept() throws IOException {
+		Socket s = new Socket();
+		s.setHost(true);
+		super.implAccept(s);
+		s.init(true);
+		return s;
 	}
 
 }
