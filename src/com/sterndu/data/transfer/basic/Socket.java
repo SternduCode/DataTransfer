@@ -343,10 +343,16 @@ public class Socket extends DatatransferSocket {
 							type + "s[length_bytes:" + Arrays.toString(length_bytes) + ", length:"
 									+ modified_data.length
 									+ ",data:" + Arrays.toString(modified_data) + ",hash:" + Arrays.toString(hash));
+			} catch (final SocketException e) {
+				try {
+					close();
+				} catch (IOException ex) {
+					ex.initCause(e);
+					ex.printStackTrace();
+				}
 			} catch (final IOException e) {
 				e.printStackTrace();
 				delayed_send.add(new Packet(type, data));
-				return;
 			}
 		}
 
