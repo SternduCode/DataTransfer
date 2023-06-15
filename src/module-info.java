@@ -6,4 +6,5 @@ module com.sterndu.DataTransfer {
 	requires transitive com.sterndu.Encryption;
 	requires transitive com.sterndu.Util; 
 	requires transitive com.sterndu.MultiCore;
+	requires kotlin.stdlib;
 }
