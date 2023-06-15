@@ -7,8 +7,9 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module" module-name="Multicore" exported="" />
-    <orderEntry type="module" module-name="Encryption" exported="" />
-    <orderEntry type="module" module-name="Util" exported="" />
+    <orderEntry type="module" module-name="Multicore" />
+    <orderEntry type="module" module-name="Encryption" />
+    <orderEntry type="module" module-name="Util" />
+    <orderEntry type="library" name="KotlinJavaRuntime" level="project" />
   </component>
 </module>
