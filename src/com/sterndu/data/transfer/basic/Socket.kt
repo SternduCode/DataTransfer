@@ -18,6 +18,8 @@ import java.util.*
 import java.util.function.BiConsumer
 import java.util.function.Consumer
 
+private const val socketClosed = "Socket closed!"
+
 open class Socket : DatatransferSocket {
 
 	/** If this Socket is in Host mode.  */
@@ -161,7 +163,7 @@ open class Socket : DatatransferSocket {
 	 */
 	@Throws(IOException::class)
 	protected fun receiveData(): Packet {
-		var packet: Packet? = null
+		var packet: Packet
 		synchronized(recLock) {
 			var b = ByteArray(5)
 			if (readXBytes(b, inputStream, b.size)) {
@@ -180,21 +182,22 @@ open class Socket : DatatransferSocket {
 									+ b.contentToString()
 						)
 					}
-				} else if ("true" == System.getProperty("debug")) {
-					if (data.size > 5000) data = data.copyOfRange(0, 5000)
-					System.err.println(
-						type.toString() + "f[length:" + length + ",data:" + data.contentToString() + ",hash:"
-								+ b.contentToString()
-					)
+				} else {
+					if ("true" == System.getProperty("debug")) {
+						if (data.size > 5000) data = data.copyOfRange(0, 5000)
+						System.err.println(
+							type.toString() + "f[length:" + length + ",data:" + data.contentToString() + ",hash:"
+									+ b.contentToString()
+						)
+					}
+					return Packet(((-128).toByte()), ByteArray(0))
 				}
 			} else {
 				if ("true" == System.getProperty("debug")) System.err.println("f" + b.contentToString())
 				return Packet(((-128).toByte()), ByteArray(0))
 			}
 		}
-		if (packet != null)
-			return Packet(packet!!.type, implReceiveData(packet!!.type, packet!!.data))
-		return Packet(((-128).toByte()), ByteArray(0)) // Cannot be reached
+		return Packet(packet.type, implReceiveData(packet.type, packet.data))
 		// type byte; length int; data byte[]; hash byte[32];
 	}
 
@@ -207,7 +210,7 @@ open class Socket : DatatransferSocket {
 	 */
 	@Throws(SocketException::class)
 	protected fun sendInternalData(type: Byte, data: ByteArray) {
-		if (isClosed) throw SocketException("Socket closed!")
+		if (isClosed) throw SocketException(socketClosed)
 		synchronized(sendLock) {
 			val modifiedData = implSendData(type, data)
 			val hash = md!!.digest(modifiedData)
@@ -291,7 +294,7 @@ open class Socket : DatatransferSocket {
 	 * @return true, if successful
 	 */
 	fun hasMessage(): Boolean {
-		return !recvVector.isEmpty()
+		return recvVector.isNotEmpty()
 	}
 
 	/**
@@ -327,9 +330,9 @@ open class Socket : DatatransferSocket {
 			delayedSend.add(Packet(type, data))
 			return
 		}
-		if (isClosed) throw SocketException("Socket closed!")
+		if (isClosed) throw SocketException(socketClosed)
 		synchronized(sendLock) {
-			if (isClosed) throw SocketException("Socket closed!")
+			if (isClosed) throw SocketException(socketClosed)
 			val modifiedData = implSendData(type, data)
 			val hash = md!!.digest(modifiedData)
 			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
@@ -374,8 +377,7 @@ open class Socket : DatatransferSocket {
 				if (handle != null) {
 					if (!handles.containsKey(type)) {
 						val it = recvVector.iterator()
-						while (it.hasNext()) {
-							val (type1, data) = it.next()
+						it.forEach { (type1, data) ->
 							if (type1 == type) {
 								handle.accept(type1, data)
 								it.remove()
