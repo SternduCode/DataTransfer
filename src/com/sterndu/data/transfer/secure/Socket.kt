@@ -1,34 +1,44 @@
-package com.sterndu.data.transfer.secure;
+@file:JvmName("Socket")
+package com.sterndu.data.transfer.secure
 
-import java.io.IOException;
-import java.net.*;
-import java.nio.*;
-import java.security.*;
-import java.security.spec.*;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import com.sterndu.data.transfer.basic.Socket
+import com.sterndu.encryption.Crypter
+import com.sterndu.encryption.CrypterList.getByVersion
+import com.sterndu.encryption.CrypterList.supportedVersions
+import com.sterndu.encryption.DiffieHellman
+import com.sterndu.multicore.Updater.Companion.getInstance
+import java.io.IOException
+import java.net.InetAddress
+import java.net.SocketException
+import java.net.UnknownHostException
+import java.nio.ByteBuffer
+import java.security.InvalidAlgorithmParameterException
+import java.security.InvalidKeyException
+import java.security.KeyFactory
+import java.security.NoSuchAlgorithmException
+import java.security.spec.InvalidKeySpecException
+import java.security.spec.X509EncodedKeySpec
+import java.util.*
+import java.util.concurrent.atomic.AtomicLong
+import javax.crypto.interfaces.DHPublicKey
 
-import javax.crypto.interfaces.DHPublicKey;
+open class Socket : Socket {
+	/**
+	 * Gets the dh.
+	 *
+	 * @return the dh
+	 */
+	/** The dh.  */
+	var dH: DiffieHellman? = null
+		protected set
 
-import com.sterndu.encryption.*;
-import com.sterndu.multicore.Updater;
-
-// TODO: Auto-generated Javadoc
-/**
- * The Class Socket.
- */
-public class Socket extends com.sterndu.data.transfer.basic.Socket {
-
-	/** The dh. */
-	protected DiffieHellman dh;
-
-	/** The crypter. */
-	protected Crypter crypter;
+	/** The crypter.  */
+	protected var crypter: Crypter? = null
 
 	/**
 	 * Instantiates a new socket.
 	 */
-	public Socket() {}
+	constructor()
 
 	/**
 	 * Instantiates a new socket.
@@ -37,9 +47,8 @@ public class Socket extends com.sterndu.data.transfer.basic.Socket {
 	 * @param port the port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public Socket(InetAddress address, int port) throws IOException {
-		super(address, port);
-	}
+	@Throws(IOException::class)
+	constructor(address: InetAddress, port: Int) : super(address, port)
 
 	/**
 	 * Instantiates a new socket.
@@ -50,9 +59,13 @@ public class Socket extends com.sterndu.data.transfer.basic.Socket {
 	 * @param localPort the local port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public Socket(InetAddress address, int port, InetAddress localAddr, int localPort) throws IOException {
-		super(address, port, localAddr, localPort);
-	}
+	@Throws(IOException::class)
+	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int) : super(
+		address,
+		port,
+		localAddr,
+		localPort
+	)
 
 	/**
 	 * Instantiates a new socket.
@@ -62,9 +75,8 @@ public class Socket extends com.sterndu.data.transfer.basic.Socket {
 	 * @throws UnknownHostException the unknown host exception
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public Socket(String host, int port) throws UnknownHostException, IOException {
-		super(host, port);
-	}
+	@Throws(IOException::class, UnknownHostException::class)
+	constructor(host: String, port: Int) : super(host, port)
 
 	/**
 	 * Instantiates a new socket.
@@ -75,9 +87,13 @@ public class Socket extends com.sterndu.data.transfer.basic.Socket {
 	 * @param localPort the local port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public Socket(String host, int port, InetAddress localAddr, int localPort) throws IOException {
-		super(host, port, localAddr, localPort);
-	}
+	@Throws(IOException::class)
+	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int) : super(
+		host,
+		port,
+		localAddr,
+		localPort
+	)
 
 	/**
 	 * Impl recieve data.
@@ -86,18 +102,10 @@ public class Socket extends com.sterndu.data.transfer.basic.Socket {
 	 * @param data the data
 	 * @return the byte[]
 	 */
-	@Override
-	protected byte[] implReceiveData(byte type, byte[] data) {
-		switch (type) {
-			case 0:
-			case -1:
-			case -2:
-			case -3:
-			case -4:
-			case -5:
-				return data;
-			default:
-				return crypter.decrypt(data);
+	override fun implReceiveData(type: Byte, data: ByteArray): ByteArray {
+		return when (type) {
+			0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte() -> data
+			else -> crypter!!.decrypt(data)
 		}
 	}
 
@@ -108,18 +116,10 @@ public class Socket extends com.sterndu.data.transfer.basic.Socket {
 	 * @param data the data
 	 * @return the byte[]
 	 */
-	@Override
-	protected byte[] implSendData(byte type, byte[] data) {
-		switch (type) {
-			case 0:
-			case -1:
-			case -2:
-			case -3:
-			case -4:
-			case -5:
-				return data;
-			default:
-				return crypter.encrypt(data);
+	override fun implSendData(type: Byte, data: ByteArray): ByteArray {
+		return when (type) {
+			0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte() -> data
+			else -> crypter!!.encrypt(data)
 		}
 	}
 
@@ -128,112 +128,101 @@ public class Socket extends com.sterndu.data.transfer.basic.Socket {
 	 *
 	 * @param host the host
 	 */
-	@Override
-	protected void init(boolean host) {
+	override fun init(host: Boolean) {
 		try {
-			this.host = host;
-			initialized = false;
-			dh = new DiffieHellman();
-			AtomicLong lastInitStageTime = new AtomicLong(System.currentTimeMillis());
-			Updater.getInstance().add((Runnable) () -> {
+			isHost = host
+			initialized = false
+			dH = DiffieHellman()
+			val lastInitStageTime = AtomicLong(System.currentTimeMillis())
+			getInstance().add(Runnable {
 				if (System.currentTimeMillis() - lastInitStageTime.get() > 2000) try {
-					close();
-					Updater.getInstance().remove("InitCheck" + hashCode());
-				} catch (IOException e) {
-					e.printStackTrace();
+					close()
+					getInstance().remove("InitCheck" + hashCode())
+				} catch (e: IOException) {
+					e.printStackTrace()
 				}
-			}, "InitCheck" + hashCode());
-			setHandle((byte) -2, (type, data) -> {
+			}, "InitCheck" + hashCode())
+			setHandle((-2).toByte()) { type: Byte, data: ByteArray ->
 				try {
-					ByteBuffer	bb			= ByteBuffer.wrap(data);
-					int			keyLength	= bb.getInt();
-					byte[]		keyData		= new byte[keyLength];
-					bb.get(keyData);
-					IntBuffer		ib	= bb.asIntBuffer();
-					List<Integer>	li	= new ArrayList<>();
-					while (ib.hasRemaining())
-						li.add(ib.get());
-					List<Integer> li2 = new ArrayList<>();
-					for (int i : CrypterList.getSupportedVersions()) if (li.contains(i)) li2.add(i);
-					Collections.sort(li2);
-					initialized = false;
-					dh.startHandshake();
-					KeyFactory kf = KeyFactory.getInstance("DiffieHellman");
-					DHPublicKey key = (DHPublicKey) kf
-							.generatePublic(new X509EncodedKeySpec(keyData, "DiffieHellman"));
-					dh.initialize(key.getParams());
-					dh.doPhase(key, true);
-					lastInitStageTime.set(System.currentTimeMillis());
-					byte[] pubKeyEnc = dh.getPublicKey().getEncoded();
-					bb = ByteBuffer.allocate(4 + pubKeyEnc.length);
-					bb.putInt(li2.get(li2.size() - 1));
-					bb.put(pubKeyEnc);
-					sendInternalData((byte) -3, bb.array());
-					crypter = CrypterList.getByVersion(li2.get(li2.size() - 1));
-					crypter.makeKey(dh.getSecret());
-					initialized = true;
-					Updater.getInstance().remove("InitCheck" + hashCode());
-				} catch (NoSuchAlgorithmException | InvalidKeySpecException
-						| InvalidAlgorithmParameterException | SocketException | InvalidKeyException e) {
-					e.printStackTrace();
+					var bb = ByteBuffer.wrap(data)
+					val keyLength = bb.getInt()
+					val keyData = ByteArray(keyLength)
+					bb[keyData]
+					val ib = bb.asIntBuffer()
+					val li: MutableList<Int> = ArrayList()
+					while (ib.hasRemaining()) li.add(ib.get())
+					li.retainAll(supportedVersions.toSet())
+					li.sort()
+					initialized = false
+					dH!!.startHandshake()
+					val kf = KeyFactory.getInstance("DiffieHellman")
+					val key = kf.generatePublic(X509EncodedKeySpec(keyData, "DiffieHellman")) as DHPublicKey
+					dH!!.initialize(key.params)
+					dH!!.doPhase(key, true)
+					lastInitStageTime.set(System.currentTimeMillis())
+					val pubKeyEnc = dH!!.publicKey.encoded
+					bb = ByteBuffer.allocate(4 + pubKeyEnc.size)
+					bb.putInt(li.last())
+					bb.put(pubKeyEnc)
+					sendInternalData((-3).toByte(), bb.array())
+					crypter = getByVersion(li.last())!!
+					crypter!!.makeKey(dH!!.getSecret()!!)
+					initialized = true
+					getInstance().remove("InitCheck" + hashCode())
+				} catch (e: NoSuchAlgorithmException) {
+					e.printStackTrace()
+				} catch (e: InvalidKeySpecException) {
+					e.printStackTrace()
+				} catch (e: InvalidAlgorithmParameterException) {
+					e.printStackTrace()
+				} catch (e: SocketException) {
+					e.printStackTrace()
+				} catch (e: InvalidKeyException) {
+					e.printStackTrace()
 				}
-			});// Test reduced number of calls && add hashing list avail stuff && add option to disable double hashing
-			setHandle((byte) -3, (type, data) -> {
+			} // Test reduced number of calls && add hashing list avail stuff && add option to disable double hashing
+			setHandle((-3).toByte()) { type: Byte, data: ByteArray ->
 				try {
-					lastInitStageTime.set(System.currentTimeMillis());
-					ByteBuffer bb = ByteBuffer.wrap(data);
-					crypter = CrypterList.getByVersion(bb.getInt());
-					byte[] keyData = new byte[data.length - 4];
-					bb.get(keyData);
-					KeyFactory kf = KeyFactory.getInstance("DiffieHellman");
-					DHPublicKey key = (DHPublicKey) kf
-							.generatePublic(new X509EncodedKeySpec(keyData, "DiffieHellman"));
-					dh.doPhase(key, true);
-					crypter.makeKey(dh.getSecret());
-					initialized = true;
-					Updater.getInstance().remove("InitCheck" + hashCode());
-				} catch (NoSuchAlgorithmException | InvalidKeySpecException | InvalidKeyException e) {
-					e.printStackTrace();
+					lastInitStageTime.set(System.currentTimeMillis())
+					val bb = ByteBuffer.wrap(data)
+					crypter = getByVersion(bb.getInt())!!
+					val keyData = ByteArray(data.size - 4)
+					bb[keyData]
+					val kf = KeyFactory.getInstance("DiffieHellman")
+					val key = kf.generatePublic(X509EncodedKeySpec(keyData, "DiffieHellman")) as DHPublicKey
+					dH!!.doPhase(key, true)
+					crypter!!.makeKey(dH!!.getSecret()!!)
+					initialized = true
+					getInstance().remove("InitCheck" + hashCode())
+				} catch (e: NoSuchAlgorithmException) {
+					e.printStackTrace()
+				} catch (e: InvalidKeySpecException) {
+					e.printStackTrace()
+				} catch (e: InvalidKeyException) {
+					e.printStackTrace()
 				}
-			});
-			super.init(host);
-			if (host) startHandshake();
-		} catch (SocketException e1) {
-			e1.printStackTrace();
+			}
+			super.init(host)
+			if (host) startHandshake()
+		} catch (e1: SocketException) {
+			e1.printStackTrace()
 		}
 	}
-
-	/**
-	 * Sets the host.
-	 *
-	 * @param host the new host
-	 */
-	@Override
-	protected void setHost(boolean host) {
-		super.setHost(host);
-	}
-
-	/**
-	 * Gets the dh.
-	 *
-	 * @return the dh
-	 */
-	public DiffieHellman getDH() { return dh; }
 
 	/**
 	 * Start handshake.
 	 *
 	 * @throws SocketException the socket exception
 	 */
-	public void startHandshake() throws SocketException {
-		initialized = false;
-		dh.startHandshake();
-		byte[]		pubKeyEnc	= dh.getPublicKey().getEncoded();
-		ByteBuffer	bb			= ByteBuffer.allocate(4 + pubKeyEnc.length + 4 * CrypterList.getSupportedVersions().length);
-		bb.putInt(pubKeyEnc.length);
-		bb.put(pubKeyEnc);
-		bb.asIntBuffer().put(CrypterList.getSupportedVersions());
-		sendInternalData((byte) -2, bb.array());
+	@Throws(SocketException::class)
+	fun startHandshake() {
+		initialized = false
+		dH!!.startHandshake()
+		val pubKeyEnc = dH!!.publicKey.encoded
+		val bb = ByteBuffer.allocate(4 + pubKeyEnc.size + 4 * supportedVersions.size)
+		bb.putInt(pubKeyEnc.size)
+		bb.put(pubKeyEnc)
+		bb.asIntBuffer().put(supportedVersions)
+		sendInternalData((-2).toByte(), bb.array())
 	}
-
 }

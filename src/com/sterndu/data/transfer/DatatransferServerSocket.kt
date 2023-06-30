@@ -1,23 +1,22 @@
-package com.sterndu.data.transfer;
+@file:JvmName("DatatransferServerSocket")
+package com.sterndu.data.transfer
 
-import java.io.IOException;
-import java.net.*;
+import java.io.IOException
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
 
-public abstract class DatatransferServerSocket extends ServerSocket {
-	public DatatransferServerSocket() throws IOException {}
+abstract class DatatransferServerSocket : ServerSocket {
 
-	public DatatransferServerSocket(int port) throws IOException {
-		super(port);
-	}
+	@Throws(IOException::class)
+	constructor()
+	@Throws(IOException::class)
+	constructor(port: Int) : super(port)
+	@Throws(IOException::class)
+	constructor(port: Int, backlog: Int) : super(port, backlog)
+	@Throws(IOException::class)
+	constructor(port: Int, backlog: Int, bindAddr: InetAddress) : super(port, backlog, bindAddr)
 
-	public DatatransferServerSocket(int port, int backlog) throws IOException {
-		super(port, backlog);
-	}
-
-	public DatatransferServerSocket(int port, int backlog, InetAddress bindAddr) throws IOException {
-		super(port, backlog, bindAddr);
-	}
-
-	@Override
-	public abstract Socket accept() throws IOException;
+	@Throws(IOException::class)
+	abstract override fun accept(): Socket
 }

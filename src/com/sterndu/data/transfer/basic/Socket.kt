@@ -1,31 +1,34 @@
-package com.sterndu.data.transfer.basic;
+@file:JvmName("Socket")
+package com.sterndu.data.transfer.basic
 
-import java.io.*;
-import java.net.*;
-import java.nio.*;
-import java.security.*;
-import java.util.*;
-import java.util.concurrent.CancellationException;
-import java.util.function.*;
+import com.sterndu.data.transfer.DatatransferSocket
+import com.sterndu.data.transfer.Packet
+import com.sterndu.multicore.Updater.Companion.getInstance
+import com.sterndu.util.interfaces.ThrowingRunnable
+import com.sterndu.util.readXBytes
+import java.io.IOException
+import java.net.InetAddress
+import java.net.SocketException
+import java.net.UnknownHostException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
+import java.util.*
+import java.util.function.BiConsumer
+import java.util.function.Consumer
 
-import com.sterndu.data.transfer.*;
-import com.sterndu.multicore.Updater;
-import com.sterndu.util.*;
-import com.sterndu.util.interfaces.ThrowingRunnable;
+open class Socket : DatatransferSocket {
 
-// TODO: Auto-generated Javadoc
-/**
- * The Class Socket.
- */
-public class Socket extends DatatransferSocket {
-
-	/** The host. */
-	protected boolean host = false;
+	/** If this Socket is in Host mode.  */
+	open var isHost = false
+		protected set
 
 	/**
 	 * Instantiates a new socket.
+	 *
 	 */
-	protected Socket() {}
+	constructor()
 
 	/**
 	 * Instantiates a new socket.
@@ -34,9 +37,9 @@ public class Socket extends DatatransferSocket {
 	 * @param port the port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public Socket(InetAddress address, int port) throws IOException {
-		super(address, port);
-		init(false);
+	@Throws(IOException::class)
+	constructor(address: InetAddress, port: Int) : super(address, port) {
+		init(false)
 	}
 
 	/**
@@ -48,10 +51,14 @@ public class Socket extends DatatransferSocket {
 	 * @param localPort the local port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public Socket(InetAddress address, int port, InetAddress localAddr, int localPort)
-			throws IOException {
-		super(address, port, localAddr, localPort);
-		init(false);
+	@Throws(IOException::class)
+	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int) : super(
+		address,
+		port,
+		localAddr,
+		localPort
+	) {
+		init(false)
 	}
 
 	/**
@@ -62,9 +69,9 @@ public class Socket extends DatatransferSocket {
 	 * @throws UnknownHostException the unknown host exception
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public Socket(String host, int port) throws UnknownHostException, IOException {
-		super(host, port);
-		init(false);
+	@Throws(IOException::class, UnknownHostException::class)
+	constructor(host: String, port: Int) : super(host, port) {
+		init(false)
 	}
 
 	/**
@@ -76,9 +83,14 @@ public class Socket extends DatatransferSocket {
 	 * @param localPort the local port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public Socket(String host, int port, InetAddress localAddr, int localPort) throws IOException {
-		super(host, port, localAddr, localPort);
-		init(false);
+	@Throws(IOException::class)
+	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int) : super(
+		host,
+		port,
+		localAddr,
+		localPort
+	) {
+		init(false)
 	}
 
 	/**
@@ -88,8 +100,8 @@ public class Socket extends DatatransferSocket {
 	 * @param data the data
 	 * @return the byte[]
 	 */
-	protected byte[] implReceiveData(byte type, byte[] data) {
-		return data;
+	protected open fun implReceiveData(type: Byte, data: ByteArray): ByteArray {
+		return data
 	}
 
 	/**
@@ -99,41 +111,46 @@ public class Socket extends DatatransferSocket {
 	 * @param data the data
 	 * @return the byte[]
 	 */
-	protected byte[] implSendData(byte type, byte[] data) {
-		return data;
+	protected open fun implSendData(type: Byte, data: ByteArray): ByteArray {
+		return data
+	}
+
+	internal fun internalInit(host: Boolean) {
+		init(host)
 	}
 
 	/**
-	 * Inits the.
+	 * Init
 	 *
-	 * @param host the host
+	 * @param host if the Socket is in Host mode
 	 */
-	protected void init(boolean host) {
+	protected open fun init(host: Boolean) {
 		try {
-			md = MessageDigest.getInstance("SHA-256");// SHA3-256
-			setHandle((byte) -1, (type, data) -> {
+			isHost = host
+			md = MessageDigest.getInstance("SHA-256") // SHA3-256
+			setHandle(((-1).toByte())) { _: Byte, _: ByteArray ->
 				try {
-					close();
-				} catch (IOException e) {
-					e.printStackTrace();
+					close()
+				} catch (e: IOException) {
+					e.printStackTrace()
 				}
-			});
-		} catch (final NoSuchAlgorithmException e) {
-			e.printStackTrace();
+			}
+		} catch (e: NoSuchAlgorithmException) {
+			e.printStackTrace()
 		}
-		Updater.getInstance().add((ThrowingRunnable) () -> {
-			if (!isClosed() && getInputStream().available() > 0) try {
-				final Packet data = receiveData();
-				if (handles.containsKey(data.type())) Objects.requireNonNull(getHandle(data.type())).accept(data.type(), data.data());
-				else recvVector.add(data);
-			} catch (final CancellationException ignored) {
-
+		getInstance().add(ThrowingRunnable {
+			if (!isClosed && inputStream.available() > 0) try {
+				val data = receiveData()
+				if (handles.containsKey(data.type)) getHandle(data.type)!!
+					.accept(data.type, data.data) else recvVector.add(data)
+			} catch (e: IOException) {
+				e.printStackTrace()
 			}
-			if (delayed_send.size() > 0 && initialized) {
-				final Packet data = delayed_send.remove(0);
-				sendData(data.type(), data.data());
+			if (delayedSend.isNotEmpty() && initialized) {
+				val (type, data1) = delayedSend.removeAt(0)
+				sendData(type, data1)
 			}
-		}, "CheckForMsgs" + hashCode());
+		}, "CheckForMsgs" + hashCode())
 	}
 
 	/**
@@ -142,37 +159,42 @@ public class Socket extends DatatransferSocket {
 	 * @return the packet
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	protected final Packet receiveData() throws IOException {
-		Packet packet;
-		sync: synchronized (recLock) {
-			byte[] b = new byte[5];
-			if (Util.readXBytes(b, getInputStream(), b.length)) {
-				final byte type = b[0];
-				final int length = ByteBuffer.wrap(b).order(ByteOrder.BIG_ENDIAN).getInt(1);
-				b = new byte[32];
-				byte[] data = new byte[length];
-				if (Util.readXBytes(data, getInputStream(), length)
-						&& Util.readXBytes(b, getInputStream(), b.length) && Arrays.equals(b, md.digest(data))) {
-					packet = new Packet(type, data);
-					if ("true".equals(System.getProperty("debug"))) {
-						if (data.length > 5000) data = Arrays.copyOfRange(data, 0, 5000);
-						System.err.println(type + "r[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
-								+ Arrays.toString(b));
-
+	@Throws(IOException::class)
+	protected fun receiveData(): Packet {
+		var packet: Packet? = null
+		synchronized(recLock) {
+			var b = ByteArray(5)
+			if (readXBytes(b, inputStream, b.size)) {
+				val type = b[0]
+				val length = ByteBuffer.wrap(b).order(ByteOrder.BIG_ENDIAN).getInt(1)
+				b = ByteArray(32)
+				var data = ByteArray(length)
+				if (readXBytes(data, inputStream, length)
+					&& readXBytes(b, inputStream, b.size) && Arrays.equals(b, md!!.digest(data))
+				) {
+					packet = Packet(type, data)
+					if ("true" == System.getProperty("debug")) {
+						if (data.size > 5000) data = data.copyOfRange(0, 5000)
+						System.err.println(
+							type.toString() + "r[length:" + length + ",data:" + data.contentToString() + ",hash:"
+									+ b.contentToString()
+						)
 					}
-					break sync;
+				} else if ("true" == System.getProperty("debug")) {
+					if (data.size > 5000) data = data.copyOfRange(0, 5000)
+					System.err.println(
+						type.toString() + "f[length:" + length + ",data:" + data.contentToString() + ",hash:"
+								+ b.contentToString()
+					)
 				}
-				if ("true".equals(System.getProperty("debug"))) {
-					if (data.length > 5000) data = Arrays.copyOfRange(data, 0, 5000);
-					System.err.println(type + "f[length:" + length + ",data:" + Arrays.toString(data) + ",hash:"
-							+ Arrays.toString(b));
-				}
+			} else {
+				if ("true" == System.getProperty("debug")) System.err.println("f" + b.contentToString())
+				return Packet(((-128).toByte()), ByteArray(0))
 			}
-			if ("true".equals(System.getProperty("debug"))) System.err.println("f" + Arrays.toString(b));
-			return new Packet((byte) -128, new byte[0]);
 		}
-		return new Packet(packet.type(), implReceiveData(packet.type(), packet.data()));
-
+		if (packet != null)
+			return Packet(packet!!.type, implReceiveData(packet!!.type, packet!!.data))
+		return Packet(((-128).toByte()), ByteArray(0)) // Cannot be reached
 		// type byte; length int; data byte[]; hash byte[32];
 	}
 
@@ -183,38 +205,31 @@ public class Socket extends DatatransferSocket {
 	 * @param data the data
 	 * @throws SocketException the socket exception
 	 */
-	protected final void sendInternalData(byte type, byte[] data) throws SocketException {
-		if (isClosed()) throw new SocketException("Soket closed!");
-		synchronized (sendLock) {
-			final byte[] modified_data = implSendData(type, data);
-			final byte[] hash = md.digest(modified_data);
-			final byte[]	length_bytes	= ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modified_data.length).array();
+	@Throws(SocketException::class)
+	protected fun sendInternalData(type: Byte, data: ByteArray) {
+		if (isClosed) throw SocketException("Socket closed!")
+		synchronized(sendLock) {
+			val modifiedData = implSendData(type, data)
+			val hash = md!!.digest(modifiedData)
+			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
 			try {
-				final OutputStream os = getOutputStream();
-				os.write(type);
-				os.write(length_bytes);
-				os.write(modified_data);
-				os.write(hash);
-				if ("true".equals(System.getProperty("debug", "false")))
-					System.err.println(
-							type + "s[length_bytes:" + Arrays.toString(length_bytes) + ", length:"
-									+ modified_data.length
-									+ ",data:" + Arrays.toString(modified_data) + ",hash:" + Arrays.toString(hash));
-			} catch (final IOException e) {
-				e.printStackTrace();
-				delayed_send.add(new Packet(type, data));
-				return;
+				val os = outputStream
+				os.write(type.toInt())
+				os.write(lengthBytes)
+				os.write(modifiedData)
+				os.write(hash)
+				if ("true" == System.getProperty("debug", "false")) System.err.println(
+					type.toString() + "s[length_bytes:" + Arrays.toString(lengthBytes) + ", length:"
+							+ modifiedData.size
+							+ ",data:" + modifiedData.contentToString() + ",hash:" + Arrays.toString(hash)
+				)
+			} catch (e: IOException) {
+				e.printStackTrace()
+				delayedSend.add(Packet(type, data))
+				return
 			}
 		}
-
 	}
-
-	/**
-	 * Sets the host.
-	 *
-	 * @param host the new host
-	 */
-	protected void setHost(boolean host) { this.host = host; }
 
 	/**
 	 * Close.
@@ -222,23 +237,23 @@ public class Socket extends DatatransferSocket {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 * @throws SocketException the socket exception
 	 */
-	@Override
-	public void close() throws IOException, SocketException {
+	@Throws(IOException::class, SocketException::class)
+	override fun close() {
 		try {
-			synchronized (recLock) {
-				synchronized (sendLock) {
-					if (!isClosed()) {
-						shutdownHook.accept(this);
-						shutdownOutput();
-						shutdownInput();
-						Updater.getInstance().remove("CheckForMsgs" + hashCode());
-						super.close();
+			synchronized(recLock) {
+				synchronized(sendLock) {
+					if (!isClosed) {
+						shutdownHook.accept(this)
+						shutdownOutput()
+						shutdownInput()
+						getInstance().remove("CheckForMsgs" + hashCode())
+						super.close()
 					}
 				}
 			}
-		} catch (NullPointerException e) {
-			Updater.getInstance().remove("CheckForMsgs" + hashCode());
-			super.close();
+		} catch (e: NullPointerException) {
+			getInstance().remove("CheckForMsgs" + hashCode())
+			super.close()
 		}
 	}
 
@@ -248,26 +263,17 @@ public class Socket extends DatatransferSocket {
 	 * @param type the type
 	 * @return the handle
 	 */
-	public final BiConsumer<Byte, byte[]> getHandle(byte type) {
-		return hasHandle(type) ? handles.get(type).value() : null;
+	fun getHandle(type: Byte): BiConsumer<Byte, ByteArray>? {
+		return if (hasHandle(type)) handles[type]!!.second else null
 	}
 
-	/**
-	 * Gets the message count.
-	 *
-	 * @return the message count
-	 */
-	public int getMessageCount() { return recvVector.size(); }
-
-	/**
-	 * Gets the message from buffer.
-	 *
-	 * @return the message from buffer
-	 */
-	public Packet getMessageFromBuffer() {
-		if (recvVector.isEmpty()) throw new EmptyStackException();
-		return recvVector.remove(0);
-	}
+	val messageCount: Int
+		get() = recvVector.size
+	val messageFromBuffer: Packet
+		get() {
+			if (recvVector.isEmpty()) throw EmptyStackException()
+			return recvVector.removeAt(0)
+		}
 
 	/**
 	 * Checks for handle.
@@ -275,8 +281,8 @@ public class Socket extends DatatransferSocket {
 	 * @param type the type
 	 * @return true, if successful
 	 */
-	public final boolean hasHandle(byte type) {
-		return handles.containsKey(type);
+	fun hasHandle(type: Byte): Boolean {
+		return handles.containsKey(type)
 	}
 
 	/**
@@ -284,24 +290,18 @@ public class Socket extends DatatransferSocket {
 	 *
 	 * @return true, if successful
 	 */
-	public boolean hasMessage() {
-		return !recvVector.isEmpty();
+	fun hasMessage(): Boolean {
+		return !recvVector.isEmpty()
 	}
-
-	/**
-	 * Checks if is host.
-	 *
-	 * @return true, if is host
-	 */
-	public boolean isHost() { return host; }
 
 	/**
 	 * Request resend.
 	 *
 	 * @throws SocketException the socket exception
 	 */
-	public void requestResend() throws SocketException {
-		sendInternalData((byte) 0, new byte[0]);
+	@Throws(SocketException::class)
+	fun requestResend() {
+		sendInternalData(0.toByte(), ByteArray(0))
 	}
 
 	/**
@@ -309,9 +309,9 @@ public class Socket extends DatatransferSocket {
 	 *
 	 * @throws SocketException the socket exception
 	 */
-	public void sendClose() throws SocketException {
-		if (!isClosed() && isConnected())
-			sendInternalData((byte) -1, new byte[0]);
+	@Throws(SocketException::class)
+	fun sendClose() {
+		if (!isClosed && isConnected) sendInternalData((-1).toByte(), ByteArray(0))
 	}
 
 	/**
@@ -321,41 +321,43 @@ public class Socket extends DatatransferSocket {
 	 * @param data the data
 	 * @throws SocketException the socket exception
 	 */
-	public final void sendData(byte type, byte[] data) throws SocketException {
+	@Throws(SocketException::class)
+	fun sendData(type: Byte, data: ByteArray) {
 		if (!initialized) {
-			delayed_send.add(new Packet(type, data));
-			return;
+			delayedSend.add(Packet(type, data))
+			return
 		}
-		if (isClosed()) throw new SocketException("Socket closed!");
-		synchronized (sendLock) {
-			if (isClosed()) throw new SocketException("Socket closed!");
-			final byte[]	modified_data	= implSendData(type, data);
-			final byte[]	hash			= md.digest(modified_data);
-			final byte[]	length_bytes	= ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modified_data.length).array();
+		if (isClosed) throw SocketException("Socket closed!")
+		synchronized(sendLock) {
+			if (isClosed) throw SocketException("Socket closed!")
+			val modifiedData = implSendData(type, data)
+			val hash = md!!.digest(modifiedData)
+			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
 			try {
-				final OutputStream os = getOutputStream();
-				os.write(type);
-				os.write(length_bytes);
-				os.write(modified_data);
-				os.write(hash);
-				if ("true".equals(System.getProperty("debug", "false")))
+				val os = outputStream
+				os.write(type.toInt())
+				os.write(lengthBytes)
+				os.write(modifiedData)
+				os.write(hash)
+				if ("true" == System.getProperty("debug", "false")) {
 					System.err.println(
-							type + "s[length_bytes:" + Arrays.toString(length_bytes) + ", length:"
-									+ modified_data.length
-									+ ",data:" + Arrays.toString(modified_data) + ",hash:" + Arrays.toString(hash));
-			} catch (final SocketException e) {
+						type.toString() + "s[length_bytes:" + Arrays.toString(lengthBytes) + ", length:"
+								+ modifiedData.size
+								+ ",data:" + modifiedData.contentToString() + ",hash:" + Arrays.toString(hash)
+					)
+				} else Unit
+			} catch (e: SocketException) {
 				try {
-					close();
-				} catch (IOException ex) {
-					ex.initCause(e);
-					ex.printStackTrace();
+					close()
+				} catch (ex: IOException) {
+					ex.initCause(e)
+					ex.printStackTrace()
 				}
-			} catch (final IOException e) {
-				e.printStackTrace();
-				delayed_send.add(new Packet(type, data));
+			} catch (e: IOException) {
+				e.printStackTrace()
+				delayedSend.add(Packet(type, data))
 			}
 		}
-
 	}
 
 	/**
@@ -365,37 +367,35 @@ public class Socket extends DatatransferSocket {
 	 * @param handle the handle
 	 * @return true, if successful
 	 */
-	public final boolean setHandle(byte type, BiConsumer<Byte, byte[]> handle) {
-		try {
-			final Class<?> caller = Class.forName(Thread.currentThread().getStackTrace()[2].getClassName());
-			if (!handles.containsKey(type) || handles.get(type).key().equals(caller)) {
+	fun setHandle(type: Byte, handle: BiConsumer<Byte, ByteArray>?): Boolean {
+		return try {
+			val caller = Class.forName(Thread.currentThread().stackTrace[2].className)
+			if (!handles.containsKey(type) || handles[type]!!.first == caller) {
 				if (handle != null) {
-					if (handles.containsKey(type)) {
-						Iterator<Packet> it = recvVector.iterator();
+					if (!handles.containsKey(type)) {
+						val it = recvVector.iterator()
 						while (it.hasNext()) {
-							Packet p = it.next();
-							if (p.type() == type) {
-								handle.accept(p.type(), p.data());
-								it.remove();
+							val (type1, data) = it.next()
+							if (type1 == type) {
+								handle.accept(type1, data)
+								it.remove()
 							}
 						}
 					}
-					handles.put(type, new Entry<>(caller, handle));
-				} else handles.remove(type);
-				return true;
+					handles[type] = caller to handle
+				} else handles.remove(type)
+				return true
 			}
-			return false;
-		} catch (final Exception e) {
-			e.printStackTrace();
-			return false;
+			false
+		} catch (e: Exception) {
+			e.printStackTrace()
+			false
 		}
 	}
 
-	/**
-	 * Sets the shutdown hook.
-	 *
-	 * @param hook the new shutdown hook
-	 */
-	public void setShutdownHook(Consumer<DatatransferSocket> hook) { shutdownHook = hook; }
-
+	override var shutdownHook: Consumer<DatatransferSocket>
+		get() = super.shutdownHook
+		set(value) {
+			super.shutdownHook = value
+		}
 }

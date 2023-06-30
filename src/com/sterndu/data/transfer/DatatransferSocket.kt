@@ -1,44 +1,55 @@
-package com.sterndu.data.transfer;
+@file:JvmName("DatatransferSocket")
+package com.sterndu.data.transfer
 
-import java.io.IOException;
-import java.net.*;
-import java.security.MessageDigest;
-import java.util.*;
-import java.util.function.*;
+import java.io.IOException
+import java.net.InetAddress
+import java.net.Proxy
+import java.net.Socket
+import java.net.UnknownHostException
+import java.security.MessageDigest
+import java.util.*
+import java.util.function.BiConsumer
+import java.util.function.Consumer
+import kotlin.jvm.Throws
 
-import com.sterndu.util.Entry;
-
-// TODO: Auto-generated Javadoc
 /**
  * The Class DatatransferSocket.
  */
-public abstract class DatatransferSocket extends Socket {
+abstract class DatatransferSocket : Socket {
 
-	/** The initialized. */
-	protected boolean initialized = true;
+	/** The initialized.  */
+	var initialized = true
+		protected set
 
-	/** The shutdown hook. */
-	protected Consumer<DatatransferSocket> shutdownHook = s -> {};
+	/** The shutdown hook.  */
+	protected open var shutdownHook = Consumer { _: DatatransferSocket -> }
 
-	/** The md. */
-	protected MessageDigest md;
+	/** The md.  */
+	@JvmField
+	protected var md: MessageDigest? = null
 
-	/** The send lock. */
-	protected Object recLock = new Object(), sendLock = new Object();
+	/** The send lock.  */
+	@JvmField
+	protected var recLock = Any()
+	@JvmField
+	protected var sendLock = Any()
 
-	/** The recv vector. */
-	protected Vector<Packet> recvVector = new Vector<>();
+	/** The recv vector.  */
+	@JvmField
+	protected var recvVector = Vector<Packet>()
 
-	/** The delayed send. */
-	protected List<Packet> delayed_send = new ArrayList<>();
+	/** The delayed send.  */
+	@JvmField
+	protected var delayedSend: MutableList<Packet> = ArrayList()
 
-	/** The handles. */
-	protected Map<Byte, Entry<Class<?>, BiConsumer<Byte, byte[]>>> handles = new HashMap<>();
+	/** The handles.  */
+	@JvmField
+	protected var handles: MutableMap<Byte, Pair<Class<*>, BiConsumer<Byte, ByteArray>>> = HashMap()
 
 	/**
 	 * Instantiates a new datatransfer socket.
 	 */
-	public DatatransferSocket() {}
+	constructor()
 
 	/**
 	 * Instantiates a new datatransfer socket.
@@ -47,9 +58,8 @@ public abstract class DatatransferSocket extends Socket {
 	 * @param port the port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public DatatransferSocket(InetAddress address, int port) throws IOException {
-		super(address, port);
-	}
+	@Throws(IOException::class)
+	constructor(address: InetAddress, port: Int) : super(address, port)
 
 	/**
 	 * Instantiates a new datatransfer socket.
@@ -60,18 +70,20 @@ public abstract class DatatransferSocket extends Socket {
 	 * @param localPort the local port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public DatatransferSocket(InetAddress address, int port, InetAddress localAddr, int localPort) throws IOException {
-		super(address, port, localAddr, localPort);
-	}
+	@Throws(IOException::class)
+	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int) : super(
+		address,
+		port,
+		localAddr,
+		localPort
+	)
 
 	/**
 	 * Instantiates a new datatransfer socket.
 	 *
 	 * @param proxy the proxy
 	 */
-	public DatatransferSocket(Proxy proxy) {
-		super(proxy);
-	}
+	constructor(proxy: Proxy?) : super(proxy)
 
 	/**
 	 * Instantiates a new datatransfer socket.
@@ -81,9 +93,8 @@ public abstract class DatatransferSocket extends Socket {
 	 * @throws UnknownHostException the unknown host exception
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public DatatransferSocket(String host, int port) throws UnknownHostException, IOException {
-		super(host, port);
-	}
+	@Throws(UnknownHostException::class, IOException::class)
+	constructor(host: String, port: Int) : super(host, port)
 
 	/**
 	 * Instantiates a new datatransfer socket.
@@ -94,16 +105,11 @@ public abstract class DatatransferSocket extends Socket {
 	 * @param localPort the local port
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	public DatatransferSocket(String host, int port, InetAddress localAddr, int localPort) throws IOException {
-		super(host, port, localAddr, localPort);
-	}
-
-	/**
-	 * Checks if is initialized.
-	 *
-	 * @return true, if is initialized
-	 */
-	public boolean isInitialized() { return initialized; }
-
-
+	@Throws(IOException::class)
+	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int) : super(
+		host,
+		port,
+		localAddr,
+		localPort
+	)
 }

@@ -1,31 +1,25 @@
-package com.sterndu.data.transfer.secure;
+@file:JvmName("ServerSocket")
+package com.sterndu.data.transfer.secure
 
-import java.io.IOException;
-import java.net.*;
+import com.sterndu.data.transfer.basic.ServerSocket
+import java.io.IOException
+import java.net.InetAddress
 
-public class ServerSocket extends com.sterndu.data.transfer.basic.ServerSocket {
+class ServerSocket : ServerSocket {
+	@Throws(IOException::class)
+	constructor()
+	@Throws(IOException::class)
+	constructor(port: Int) : super(port)
+	@Throws(IOException::class)
+	constructor(port: Int, backlog: Int) : super(port, backlog)
+	@Throws(IOException::class)
+	constructor(port: Int, backlog: Int, bindAddr: InetAddress?) : super(port, backlog, bindAddr)
 
-	public ServerSocket() throws IOException {}
-
-	public ServerSocket(int port) throws IOException {
-		super(port);
+	@Throws(IOException::class)
+	override fun accept(): Socket {
+		val s = Socket()
+		super.implAccept(s)
+		s.internalInit(true)
+		return s
 	}
-
-	public ServerSocket(int port, int backlog) throws IOException {
-		super(port, backlog);
-	}
-
-	public ServerSocket(int port, int backlog, InetAddress bindAddr) throws IOException {
-		super(port, backlog, bindAddr);
-	}
-
-	@Override
-	public Socket accept() throws IOException {
-		Socket s = new Socket();
-		s.setHost(true);
-		super.implAccept(s);
-		s.init(true);
-		return s;
-	}
-
 }
