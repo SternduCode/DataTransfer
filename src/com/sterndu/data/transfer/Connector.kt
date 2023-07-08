@@ -4,7 +4,6 @@ package com.sterndu.data.transfer
 import com.sterndu.data.transfer.basic.Socket
 import java.net.SocketException
 import java.util.*
-import java.util.function.BiConsumer
 
 
 class Connector(
@@ -32,10 +31,10 @@ class Connector(
 		}
 	}
 
-	var handle: BiConsumer<Byte, ByteArray>? = null
+	var handle: ((Byte, ByteArray) -> Unit)? = null
 		set(handle) {
 			field = handle
-			for (dpt in packets) handle?.accept(dpt.type, dpt.data)
+			if (handle != null) for (dpt in packets) handle(dpt.type, dpt.data)
 		}
 
 	private val packets: MutableList<DataPlusType>
@@ -70,11 +69,11 @@ class Connector(
 	 */
 	fun enableHandle() {
 		handleDisabled = false
-		sock.setHandle(type) { _: Byte?, data: ByteArray ->
+		sock.setHandle(type) { _: Byte, data: ByteArray ->
 			val type = data[0]
 			val dat = ByteArray(data.size - 1)
 			System.arraycopy(data, 1, dat, 0, dat.size)
-			if (handle == null) packets.add(DataPlusType(type, dat)) else handle!!.accept(type, dat)
+			if (handle != null) handle?.let { it(type, dat) } else packets.add(DataPlusType(type, dat))
 		}
 	}
 
