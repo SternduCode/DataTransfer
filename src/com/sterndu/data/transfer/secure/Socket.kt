@@ -6,7 +6,7 @@ import com.sterndu.encryption.Crypter
 import com.sterndu.encryption.CrypterList.getByVersion
 import com.sterndu.encryption.CrypterList.supportedVersions
 import com.sterndu.encryption.DiffieHellman
-import com.sterndu.multicore.Updater.Companion.getInstance
+import com.sterndu.multicore.Updater
 import java.io.IOException
 import java.net.InetAddress
 import java.net.SocketException
@@ -123,6 +123,10 @@ open class Socket : Socket {
 		}
 	}
 
+	private fun removeUpdater(key: String) {
+		Updater.remove(key)
+	}
+
 	/**
 	 * Inits the.
 	 *
@@ -134,10 +138,10 @@ open class Socket : Socket {
 			initialized = false
 			dH = DiffieHellman()
 			val lastInitStageTime = AtomicLong(System.currentTimeMillis())
-			getInstance().add(Runnable {
+			Updater.add(Runnable {
 				if (System.currentTimeMillis() - lastInitStageTime.get() > 2000) try {
 					close()
-					getInstance().remove("InitCheck" + hashCode())
+					removeUpdater("InitCheck" + hashCode())
 				} catch (e: IOException) {
 					e.printStackTrace()
 				}
@@ -168,7 +172,7 @@ open class Socket : Socket {
 					crypter = getByVersion(li.last())!!
 					crypter!!.makeKey(dH!!.getSecret()!!)
 					initialized = true
-					getInstance().remove("InitCheck" + hashCode())
+					removeUpdater("InitCheck" + hashCode())
 				} catch (e: NoSuchAlgorithmException) {
 					e.printStackTrace()
 				} catch (e: InvalidKeySpecException) {
@@ -193,7 +197,7 @@ open class Socket : Socket {
 					dH!!.doPhase(key, true)
 					crypter!!.makeKey(dH!!.getSecret()!!)
 					initialized = true
-					getInstance().remove("InitCheck" + hashCode())
+					removeUpdater("InitCheck" + hashCode())
 				} catch (e: NoSuchAlgorithmException) {
 					e.printStackTrace()
 				} catch (e: InvalidKeySpecException) {
