@@ -160,7 +160,7 @@ open class Socket : Socket {
 					initialized = false
 					dH!!.startHandshake()
 					val kf = KeyFactory.getInstance("DiffieHellman")
-					val key = kf.generatePublic(X509EncodedKeySpec(keyData, "DiffieHellman")) as DHPublicKey
+					val key = kf.generatePublic(X509EncodedKeySpec(keyData)) as DHPublicKey
 					dH!!.initialize(key.params)
 					dH!!.doPhase(key, true)
 					lastInitStageTime.set(System.currentTimeMillis())
@@ -193,7 +193,7 @@ open class Socket : Socket {
 					val keyData = ByteArray(data.size - 4)
 					bb[keyData]
 					val kf = KeyFactory.getInstance("DiffieHellman")
-					val key = kf.generatePublic(X509EncodedKeySpec(keyData, "DiffieHellman")) as DHPublicKey
+					val key = kf.generatePublic(X509EncodedKeySpec(keyData)) as DHPublicKey
 					dH!!.doPhase(key, true)
 					crypter!!.makeKey(dH!!.getSecret()!!)
 					initialized = true
