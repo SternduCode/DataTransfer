@@ -104,7 +104,7 @@ open class Socket : Socket {
 	 */
 	override fun implReceiveData(type: Byte, data: ByteArray): ByteArray {
 		return when (type) {
-			0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte() -> data
+			0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte(), (-126).toByte() -> data
 			else -> crypter!!.decrypt(data)
 		}
 	}
@@ -118,7 +118,7 @@ open class Socket : Socket {
 	 */
 	override fun implSendData(type: Byte, data: ByteArray): ByteArray {
 		return when (type) {
-			0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte() -> data
+			0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte(), (-126).toByte() -> data
 			else -> crypter!!.encrypt(data)
 		}
 	}
