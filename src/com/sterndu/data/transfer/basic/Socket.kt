@@ -3,7 +3,7 @@ package com.sterndu.data.transfer.basic
 
 import com.sterndu.data.transfer.DatatransferSocket
 import com.sterndu.data.transfer.Packet
-import com.sterndu.multicore.Updater.Companion.getInstance
+import com.sterndu.multicore.Updater
 import com.sterndu.util.interfaces.ThrowingRunnable
 import com.sterndu.util.readXBytes
 import java.io.IOException
@@ -15,10 +15,7 @@ import java.nio.ByteOrder
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.*
-import java.util.function.BiConsumer
-import java.util.function.Consumer
-
-private const val socketClosed = "Socket closed!"
+import kotlin.collections.ArrayList
 
 open class Socket : DatatransferSocket {
 
@@ -140,11 +137,10 @@ open class Socket : DatatransferSocket {
 		} catch (e: NoSuchAlgorithmException) {
 			e.printStackTrace()
 		}
-		getInstance().add(ThrowingRunnable {
+		Updater.add(ThrowingRunnable {
 			if (!isClosed && inputStream.available() > 0) try {
 				val data = receiveData()
-				if (handles.containsKey(data.type)) getHandle(data.type)!!
-					.accept(data.type, data.data) else recvVector.add(data)
+				if (handles.containsKey(data.type)) getHandle(data.type)!!(data.type, data.data) else recvVector.add(data)
 			} catch (e: IOException) {
 				e.printStackTrace()
 			}
@@ -226,6 +222,8 @@ open class Socket : DatatransferSocket {
 							+ modifiedData.size
 							+ ",data:" + modifiedData.contentToString() + ",hash:" + Arrays.toString(hash)
 				)
+			} catch (e: SocketException) {
+				throw e
 			} catch (e: IOException) {
 				e.printStackTrace()
 				delayedSend.add(Packet(type, data))
@@ -245,11 +243,16 @@ open class Socket : DatatransferSocket {
 		try {
 			synchronized(recLock) {
 				synchronized(sendLock) {
-					if (!isClosed) {
-						shutdownHook.accept(this)
-						shutdownOutput()
-						shutdownInput()
-						getInstance().remove("CheckForMsgs" + hashCode())
+					try {
+						if (!isClosed) {
+							shutdownHook(this)
+							shutdownOutput()
+							shutdownInput()
+							Updater.remove("CheckForMsgs" + hashCode())
+							Updater.remove("Ping" + hashCode())
+							super.close()
+						}
+					} catch (e: SocketException) {
 						super.close()
 					}
 				}
@@ -266,7 +269,7 @@ open class Socket : DatatransferSocket {
 	 * @param type the type
 	 * @return the handle
 	 */
-	fun getHandle(type: Byte): BiConsumer<Byte, ByteArray>? {
+	fun getHandle(type: Byte): ((Byte, ByteArray) -> Unit)? {
 		return if (hasHandle(type)) handles[type]!!.second else null
 	}
 
@@ -370,7 +373,7 @@ open class Socket : DatatransferSocket {
 	 * @param handle the handle
 	 * @return true, if successful
 	 */
-	fun setHandle(type: Byte, handle: BiConsumer<Byte, ByteArray>?): Boolean {
+	fun setHandle(type: Byte, handle: ((Byte, ByteArray) -> Unit)?): Boolean {
 		return try {
 			val caller = Class.forName(Thread.currentThread().stackTrace[2].className)
 			if (!handles.containsKey(type) || handles[type]!!.first == caller) {
@@ -379,7 +382,7 @@ open class Socket : DatatransferSocket {
 						val it = recvVector.iterator()
 						it.forEach { (type1, data) ->
 							if (type1 == type) {
-								handle.accept(type1, data)
+								handle(type1, data)
 								it.remove()
 							}
 						}
@@ -395,9 +398,13 @@ open class Socket : DatatransferSocket {
 		}
 	}
 
-	override var shutdownHook: Consumer<DatatransferSocket>
+	override var shutdownHook: (DatatransferSocket) -> Unit
 		get() = super.shutdownHook
 		set(value) {
 			super.shutdownHook = value
 		}
+
+	companion object {
+		private const val socketClosed = "Socket closed!"
+	}
 }
