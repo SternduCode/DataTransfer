@@ -8,9 +8,6 @@ import java.net.Socket
 import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.util.*
-import java.util.function.BiConsumer
-import java.util.function.Consumer
-import kotlin.jvm.Throws
 
 /**
  * The Class DatatransferSocket.
@@ -22,7 +19,7 @@ abstract class DatatransferSocket : Socket {
 		protected set
 
 	/** The shutdown hook.  */
-	protected open var shutdownHook = Consumer { _: DatatransferSocket -> }
+	protected open var shutdownHook = { _: DatatransferSocket -> }
 
 	/** The md.  */
 	@JvmField
@@ -44,7 +41,7 @@ abstract class DatatransferSocket : Socket {
 
 	/** The handles.  */
 	@JvmField
-	protected var handles: MutableMap<Byte, Pair<Class<*>, BiConsumer<Byte, ByteArray>>> = HashMap()
+	protected var handles: MutableMap<Byte, Pair<Class<*>, (Byte, ByteArray) -> Unit>> = HashMap()
 
 	/**
 	 * Instantiates a new datatransfer socket.
