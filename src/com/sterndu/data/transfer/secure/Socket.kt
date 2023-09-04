@@ -6,6 +6,7 @@ import com.sterndu.encryption.Crypter
 import com.sterndu.encryption.CrypterList.getByVersion
 import com.sterndu.encryption.CrypterList.supportedVersions
 import com.sterndu.encryption.DiffieHellman
+import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import java.io.IOException
 import java.net.InetAddress
@@ -20,15 +21,16 @@ import java.security.spec.InvalidKeySpecException
 import java.security.spec.X509EncodedKeySpec
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
+import java.util.logging.Level
+import java.util.logging.Logger
 import javax.crypto.interfaces.DHPublicKey
 
+private const val secureSocket = "Secure Socket"
+
 open class Socket : Socket {
-	/**
-	 * Gets the dh.
-	 *
-	 * @return the dh
-	 */
-	/** The dh.  */
+
+	private val logger: Logger
+
 	var dH: DiffieHellman? = null
 		protected set
 
@@ -38,7 +40,9 @@ open class Socket : Socket {
 	/**
 	 * Instantiates a new socket.
 	 */
-	constructor()
+	constructor() {
+		logger = LoggingUtil.getLogger(secureSocket)
+	}
 
 	/**
 	 * Instantiates a new socket.
@@ -48,7 +52,9 @@ open class Socket : Socket {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
-	constructor(address: InetAddress, port: Int) : super(address, port)
+	constructor(address: InetAddress, port: Int) : super(address, port) {
+		logger = LoggingUtil.getLogger(secureSocket)
+	}
 
 	/**
 	 * Instantiates a new socket.
@@ -65,7 +71,9 @@ open class Socket : Socket {
 		port,
 		localAddr,
 		localPort
-	)
+	) {
+		logger = LoggingUtil.getLogger(secureSocket)
+	}
 
 	/**
 	 * Instantiates a new socket.
@@ -76,7 +84,9 @@ open class Socket : Socket {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class, UnknownHostException::class)
-	constructor(host: String, port: Int) : super(host, port)
+	constructor(host: String, port: Int) : super(host, port) {
+		logger = LoggingUtil.getLogger(secureSocket)
+	}
 
 	/**
 	 * Instantiates a new socket.
@@ -93,7 +103,9 @@ open class Socket : Socket {
 		port,
 		localAddr,
 		localPort
-	)
+	) {
+		logger = LoggingUtil.getLogger(secureSocket)
+	}
 
 	/**
 	 * Impl recieve data.
@@ -141,9 +153,10 @@ open class Socket : Socket {
 			Updater.add(Runnable {
 				if (System.currentTimeMillis() - lastInitStageTime.get() > 2000) try {
 					close()
+					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize")
 					removeUpdater("InitCheck" + hashCode())
 				} catch (e: IOException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				}
 			}, "InitCheck" + hashCode())
 			setHandle((-2).toByte()) { type: Byte, data: ByteArray ->
@@ -174,15 +187,15 @@ open class Socket : Socket {
 					initialized = true
 					removeUpdater("InitCheck" + hashCode())
 				} catch (e: NoSuchAlgorithmException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				} catch (e: InvalidKeySpecException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				} catch (e: InvalidAlgorithmParameterException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				} catch (e: SocketException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				} catch (e: InvalidKeyException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				}
 			} // Test reduced number of calls && add hashing list avail stuff && add option to disable double hashing
 			setHandle((-3).toByte()) { type: Byte, data: ByteArray ->
@@ -199,17 +212,17 @@ open class Socket : Socket {
 					initialized = true
 					removeUpdater("InitCheck" + hashCode())
 				} catch (e: NoSuchAlgorithmException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				} catch (e: InvalidKeySpecException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				} catch (e: InvalidKeyException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, secureSocket, e)
 				}
 			}
 			super.init(host)
 			if (host) startHandshake()
-		} catch (e1: SocketException) {
-			e1.printStackTrace()
+		} catch (e: SocketException) {
+			logger.log(Level.WARNING, secureSocket, e)
 		}
 	}
 

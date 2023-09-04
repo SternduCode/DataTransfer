@@ -3,6 +3,7 @@ package com.sterndu.data.transfer.basic
 
 import com.sterndu.data.transfer.DatatransferSocket
 import com.sterndu.data.transfer.Packet
+import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import com.sterndu.util.interfaces.ThrowingRunnable
 import com.sterndu.util.readXBytes
@@ -15,25 +16,36 @@ import java.nio.ByteOrder
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.*
+import java.util.logging.Level
+import java.util.logging.Logger
 import kotlin.collections.ArrayList
+
+private const val basicSocket = "Basic Socket"
+
+private const val socketAlreadyClosed = "Socket already closed"
+
+private const val socketClosed = "Socket closed!"
 
 open class Socket : DatatransferSocket {
 
-	/** If this Socket is in Host mode.  */
+	private val logger: Logger
+
 	open var isHost = false
 		protected set
 
-	val pingLock = Any()
+	private val pingLock = Any()
 
-	val lastPings = ArrayList<Long>()
+	private val lastPings = ArrayList<Long>()
 
-	var pingReceived = -1L
+	private var pingReceived = 0L
 
 	/**
 	 * Instantiates a new socket.
 	 *
 	 */
-	constructor()
+	constructor() {
+		logger = LoggingUtil.getLogger(basicSocket)
+	}
 
 	/**
 	 * Instantiates a new socket.
@@ -44,6 +56,7 @@ open class Socket : DatatransferSocket {
 	 */
 	@Throws(IOException::class)
 	constructor(address: InetAddress, port: Int) : super(address, port) {
+		logger = LoggingUtil.getLogger(basicSocket)
 		init(false)
 	}
 
@@ -63,6 +76,7 @@ open class Socket : DatatransferSocket {
 		localAddr,
 		localPort
 	) {
+		logger = LoggingUtil.getLogger(basicSocket)
 		init(false)
 	}
 
@@ -76,6 +90,7 @@ open class Socket : DatatransferSocket {
 	 */
 	@Throws(IOException::class, UnknownHostException::class)
 	constructor(host: String, port: Int) : super(host, port) {
+		logger = LoggingUtil.getLogger(basicSocket)
 		init(false)
 	}
 
@@ -95,6 +110,7 @@ open class Socket : DatatransferSocket {
 		localAddr,
 		localPort
 	) {
+		logger = LoggingUtil.getLogger(basicSocket)
 		init(false)
 	}
 
@@ -135,32 +151,39 @@ open class Socket : DatatransferSocket {
 			md = MessageDigest.getInstance("SHA-256") // SHA3-256
 			setHandle(((-1).toByte())) { _: Byte, _: ByteArray ->
 				try {
-					close()
+					if (!isClosed) {
+						logger.fine("close recv $this")
+						close()
+					}
 				} catch (e: IOException) {
-					e.printStackTrace()
+					logger.log(Level.WARNING, basicSocket, e)
 				}
 			}
 			setHandle((-127).toByte()) { _: Byte, data: ByteArray ->
-				if (String(data, Charsets.UTF_8) == "Ping")
-					sendData((-127).toByte(), "Pong".toByteArray(Charsets.UTF_8))
-				else pingReceived = System.currentTimeMillis()
+				if (!isClosed) {
+					if (String(data, Charsets.UTF_8) == "Ping")
+						sendData((-127).toByte(), "Pong".toByteArray(Charsets.UTF_8))
+					else pingReceived = System.currentTimeMillis()
+				}
 			}
 			setHandle((-126).toByte()) { _: Byte, data: ByteArray ->
-				if (String(data, Charsets.UTF_8) == "Ping")
-					sendInternalData((-126).toByte(), "Pong".toByteArray(Charsets.UTF_8))
-				else pingReceived = System.currentTimeMillis()
+				if (!isClosed) {
+					if (String(data, Charsets.UTF_8) == "Ping")
+						sendInternalData((-126).toByte(), "Pong".toByteArray(Charsets.UTF_8))
+					else pingReceived = System.currentTimeMillis()
+				}
 			}
 		} catch (e: NoSuchAlgorithmException) {
-			e.printStackTrace()
+			logger.log(Level.WARNING, basicSocket, e)
 		}
 		Updater.add(ThrowingRunnable {
 			if (!isClosed && inputStream.available() > 0) try {
 				val data = receiveData()
 				if (handles.containsKey(data.type)) getHandle(data.type)!!(data.type, data.data) else recvVector.add(data)
 			} catch (e: IOException) {
-				e.printStackTrace()
+				logger.log(Level.WARNING, basicSocket, e)
 			}
-			if (delayedSend.isNotEmpty() && initialized) {
+			if (delayedSend.isNotEmpty() && initialized && !isClosed) {
 				val (type, data1) = delayedSend.removeAt(0)
 				sendData(type, data1)
 			}
@@ -178,39 +201,36 @@ open class Socket : DatatransferSocket {
 		var packet: Packet
 		synchronized(recLock) {
 			var b = ByteArray(5)
-			if (readXBytes(b, inputStream, b.size)) {
+			if (readXBytes(b, inputStream, b.size, 5000)) {
 				val type = b[0]
 				val length = ByteBuffer.wrap(b).order(ByteOrder.BIG_ENDIAN).getInt(1)
 				b = ByteArray(32)
 				var data = ByteArray(length)
-				if (readXBytes(data, inputStream, length)
-					&& readXBytes(b, inputStream, b.size) && Arrays.equals(b, md!!.digest(data))
+				if (readXBytes(data, inputStream, length, 5000)
+					&& readXBytes(b, inputStream, b.size, 5000) && b.contentEquals(md!!.digest(data))
 				) {
 					packet = Packet(type, data)
-					if ("true" == System.getProperty("debug")) {
-						if (data.size > 5000) data = data.copyOfRange(0, 5000)
-						System.err.println(
-							type.toString() + "r[length:" + length + ",data:" + data.contentToString() + ",hash:"
-									+ b.contentToString()
-						)
-					}
+					if (data.size > 5000) data = data.copyOfRange(0, 5000)
+					logReceiveState(type, 'r', length, data, b)
 				} else {
-					if ("true" == System.getProperty("debug")) {
-						if (data.size > 5000) data = data.copyOfRange(0, 5000)
-						System.err.println(
-							type.toString() + "f[length:" + length + ",data:" + data.contentToString() + ",hash:"
-									+ b.contentToString()
-						)
-					}
+					if (data.size > 5000) data = data.copyOfRange(0, 5000)
+					logReceiveState(type, 'f', length, data, b)
 					return Packet(((-128).toByte()), ByteArray(0))
 				}
 			} else {
-				if ("true" == System.getProperty("debug")) System.err.println("f" + b.contentToString())
+				logger.fine("f" + b.contentToString())
 				return Packet(((-128).toByte()), ByteArray(0))
 			}
 		}
 		return Packet(packet.type, implReceiveData(packet.type, packet.data))
 		// type byte; length int; data byte[]; hash byte[32];
+	}
+
+	private fun logReceiveState(type: Byte, state: Char, length: Int, data: ByteArray, hash: ByteArray) {
+		if (state == 'r')
+			logger.finest(type.toString() + "$type $state[length: $length,data: ${data.contentToString()},hash: ${hash.contentToString()}")
+		else
+			logger.fine(type.toString() + "$type $state[length: $length,data: ${data.contentToString()},hash: ${hash.contentToString()}")
 	}
 
 	/**
@@ -224,6 +244,7 @@ open class Socket : DatatransferSocket {
 	protected fun sendInternalData(type: Byte, data: ByteArray) {
 		if (isClosed) throw SocketException(socketClosed)
 		synchronized(sendLock) {
+			if (isClosed) return
 			val modifiedData = implSendData(type, data)
 			val hash = md!!.digest(modifiedData)
 			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
@@ -233,15 +254,17 @@ open class Socket : DatatransferSocket {
 				os.write(lengthBytes)
 				os.write(modifiedData)
 				os.write(hash)
-				if ("true" == System.getProperty("debug", "false")) System.err.println(
-					type.toString() + "s[length_bytes:" + Arrays.toString(lengthBytes) + ", length:"
+				logger.finest(
+					type.toString() + "s[length_bytes:" + lengthBytes.contentToString() + ", length:"
 							+ modifiedData.size
-							+ ",data:" + modifiedData.contentToString() + ",hash:" + Arrays.toString(hash)
+							+ ",data:" + modifiedData.contentToString() + ",hash:" + hash.contentToString()
 				)
 			} catch (e: SocketException) {
-				throw e
+				if (e.message != "Broken pipe")
+					throw e
+				else logger.log(Level.FINEST, basicSocket, e)
 			} catch (e: IOException) {
-				e.printStackTrace()
+				logger.log(Level.WARNING, basicSocket, e)
 				delayedSend.add(Packet(type, data))
 				return
 			}
@@ -256,6 +279,7 @@ open class Socket : DatatransferSocket {
 	 */
 	@Throws(IOException::class, SocketException::class)
 	override fun close() {
+		logger.fine("close ${Thread.currentThread().stackTrace.contentToString()}")
 		try {
 			synchronized(recLock) {
 				synchronized(sendLock) {
@@ -265,7 +289,7 @@ open class Socket : DatatransferSocket {
 							shutdownOutput()
 							shutdownInput()
 							Updater.remove("CheckForMsgs" + hashCode())
-							Updater.remove("Ping" + hashCode())
+							disablePeriodicPing()
 							super.close()
 						}
 					} catch (e: SocketException) {
@@ -275,9 +299,13 @@ open class Socket : DatatransferSocket {
 			}
 		} catch (e: NullPointerException) {
 			Updater.remove("CheckForMsgs" + hashCode())
-			Updater.remove("Ping" + hashCode())
+			disablePeriodicPing()
 			super.close()
 		}
+	}
+
+	fun disablePeriodicPing() {
+		Updater.remove("Ping" + hashCode())
 	}
 
 	/**
@@ -331,80 +359,104 @@ open class Socket : DatatransferSocket {
 
 	@Throws(SocketException::class)
 	fun ping(): Long {
-		if (!isClosed && isConnected && initialized) {
-			synchronized(pingLock) {
-				val startTime = System.currentTimeMillis()
-				try {
-					sendData((-127).toByte(), "Ping".toByteArray(Charsets.UTF_8))
-				} catch (e: Exception) {
-					println("Socket already closed")
-				}
-				while (pingReceived == -1L && System.currentTimeMillis() - startTime < 2000) {
-					Thread.sleep(1)
-				}
-				if (System.currentTimeMillis() - startTime >= 2000) {
-					try {
-						sendClose()
-					} catch (e: SocketException) {
-						println("Socket already closed")
-					}
-					close()
-					return 2000
-				}
-				val roundTripTime = pingReceived - startTime
-				pingReceived = -1L
-				lastPings.add(roundTripTime)
-				if (lastPings.size > 32) lastPings.removeAll(lastPings.subList(0, lastPings.size - 32).toSet())
-				return roundTripTime
+		if (isClosed || !isConnected || !initialized) return 0
+		synchronized(pingLock) {
+			if (isClosed || !isConnected || !initialized) return 0
+			val startTime = System.currentTimeMillis()
+			try {
+				sendData((-127).toByte(), "Ping".toByteArray(Charsets.UTF_8))
+			} catch (e: Exception) {
+				logger.finer(socketAlreadyClosed)
+				Updater.remove("Ping" + hashCode())
 			}
-		} else return 0
+			while (pingReceived == -1L && System.currentTimeMillis() - startTime < 2000) {
+				Thread.sleep(1)
+			}
+			if (System.currentTimeMillis() - startTime >= 2000) {
+				try {
+					sendClose()
+				} catch (e: SocketException) {
+					logger.finer(socketAlreadyClosed)
+					Updater.remove("Ping" + hashCode())
+				}
+				close()
+				return 2000
+			}
+			val roundTripTime = pingReceived - startTime
+			pingReceived = -1L
+			lastPings.add(roundTripTime)
+			if (lastPings.size > 32) lastPings.removeAll(lastPings.subList(0, lastPings.size - 32).toSet())
+			return roundTripTime
+		}
 	}
 
 	@Throws(SocketException::class)
 	fun internalPing(): Long {
-		if (!isClosed && isConnected && initialized) {
-			synchronized(pingLock) {
-				val startTime = System.currentTimeMillis()
-				try {
-					sendInternalData((-126).toByte(), "Ping".toByteArray(Charsets.UTF_8))
-				} catch (e: Exception) {
-					println("Socket already closed")
-				}
-				while (pingReceived == -1L && System.currentTimeMillis() - startTime < 2000) {
-					Thread.sleep(1)
-				}
-				if (System.currentTimeMillis() - startTime >= 2000) {
-					try {
-						sendClose()
-					} catch (e: Exception) {
-						println("Socket already closed")
-					}
-					close()
-					return 2000
-				}
-				val roundTripTime = pingReceived - startTime
+		if (isClosed || !isConnected || !initialized) return 0
+		synchronized(pingLock) {
+			if (isClosed || !isConnected || !initialized) return 0
+			val startTime = System.currentTimeMillis()
+			try {
 				pingReceived = -1L
-				lastPings.add(roundTripTime)
-				if (lastPings.size > 32) lastPings.removeAll(lastPings.subList(0, lastPings.size - 32).toSet())
-				return roundTripTime
+				sendInternalData((-126).toByte(), "Ping".toByteArray(Charsets.UTF_8))
+			} catch (e: Exception) {
+				logger.finer(socketAlreadyClosed)
+				Updater.remove("Ping" + hashCode())
 			}
-		} else return 0
+			while (pingReceived == -1L && System.currentTimeMillis() - startTime < 2000) {
+				Thread.sleep(1)
+			}
+			if (System.currentTimeMillis() - startTime >= 2000) {
+				try {
+					sendClose()
+				} catch (e: Exception) {
+					logger.finer(socketAlreadyClosed)
+					Updater.remove("Ping" + hashCode())
+				}
+				if (!isClosed)
+					close()
+				return 2000
+			}
+			val roundTripTime = pingReceived - startTime
+			pingReceived = -1L
+			lastPings.add(roundTripTime)
+			if (lastPings.size > 32) lastPings.removeAll(lastPings.subList(0, lastPings.size - 32).toSet())
+			return roundTripTime
+		}
 	}
 
 	fun setupPeriodicInternalPing(millis: Long = 100) {
 		Updater.add(Runnable {
-			Thread {
-				internalPing()
-			}.start()
+			if (!isClosed) {
+				if (pingReceived != -1L) {
+					Thread {
+						internalPing()
+					}.start()
+				}
+			} else {
+				disablePeriodicPing()
+			}
 		}, "Ping" + hashCode(), millis)
+		Thread {
+			internalPing()
+		}.start()
 	}
 
 	fun setupPeriodicPing(millis: Long = 100) {
 		Updater.add(Runnable {
-			Thread {
-				ping()
-			}.start()
+			if (!isClosed) {
+				if (pingReceived != -1L) {
+					Thread {
+						ping()
+					}.start()
+				}
+			} else {
+				disablePeriodicPing()
+			}
 		}, "Ping" + hashCode(), millis)
+		Thread {
+			ping()
+		}.start()
 	}
 
 	/**
@@ -442,22 +494,18 @@ open class Socket : DatatransferSocket {
 				os.write(lengthBytes)
 				os.write(modifiedData)
 				os.write(hash)
-				if ("true" == System.getProperty("debug", "false")) {
-					System.err.println(
-						type.toString() + "s[length_bytes:" + Arrays.toString(lengthBytes) + ", length:"
-								+ modifiedData.size
-								+ ",data:" + modifiedData.contentToString() + ",hash:" + Arrays.toString(hash)
-					)
-				} else Unit
+				logger.finest(type.toString() + "s[length_bytes:" + lengthBytes.contentToString() + ", length:" + modifiedData.size +
+						",data:" + modifiedData.contentToString() + ",hash:" + hash.contentToString()
+				)
 			} catch (e: SocketException) {
 				try {
 					close()
 				} catch (ex: IOException) {
 					ex.initCause(e)
-					ex.printStackTrace()
+					logger.log(Level.WARNING, basicSocket, ex)
 				}
 			} catch (e: IOException) {
-				e.printStackTrace()
+				logger.log(Level.WARNING, basicSocket, e)
 				delayedSend.add(Packet(type, data))
 			}
 		}
@@ -490,7 +538,7 @@ open class Socket : DatatransferSocket {
 			}
 			false
 		} catch (e: Exception) {
-			e.printStackTrace()
+			logger.log(Level.WARNING, basicSocket, e)
 			false
 		}
 	}
@@ -501,7 +549,4 @@ open class Socket : DatatransferSocket {
 			super.shutdownHook = value
 		}
 
-	companion object {
-		private const val socketClosed = "Socket closed!"
-	}
 }
