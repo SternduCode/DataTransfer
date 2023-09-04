@@ -315,7 +315,7 @@ open class Socket : DatatransferSocket {
 	 * @return the handle
 	 */
 	fun getHandle(type: Byte): ((Byte, ByteArray) -> Unit)? {
-		return if (hasHandle(type)) handles[type]!!.second else null
+		return handles[type]?.second
 	}
 
 	val messageCount: Int
@@ -520,23 +520,25 @@ open class Socket : DatatransferSocket {
 	 */
 	fun setHandle(type: Byte, handle: ((Byte, ByteArray) -> Unit)?): Boolean {
 		return try {
-			val caller = Class.forName(Thread.currentThread().stackTrace[2].className)
-			if (!handles.containsKey(type) || handles[type]!!.first == caller) {
-				if (handle != null) {
-					if (!handles.containsKey(type)) {
-						val it = recvVector.iterator()
-						it.forEach { (type1, data) ->
-							if (type1 == type) {
-								handle(type1, data)
-								it.remove()
+			synchronized(this) {
+				val caller = Class.forName(Thread.currentThread().stackTrace[2].className)
+				if (handles[type]?.first == caller) {
+					if (handle != null) {
+						if (!handles.containsKey(type)) {
+							val it = recvVector.iterator()
+							it.forEach { (type1, data) ->
+								if (type1 == type) {
+									handle(type1, data)
+									it.remove()
+								}
 							}
 						}
-					}
-					handles[type] = caller to handle
-				} else handles.remove(type)
-				return true
+						handles[type] = caller to handle
+					} else handles.remove(type)
+					return true
+				}
+				false
 			}
-			false
 		} catch (e: Exception) {
 			logger.log(Level.WARNING, basicSocket, e)
 			false

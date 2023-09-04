@@ -10,26 +10,6 @@ class Connector(
 	val sock: Socket,
 	val type: Byte
 ) {
-	data class DataPlusType(val type: Byte, val data: ByteArray) {
-
-		override fun equals(other: Any?): Boolean {
-			if (other === this) return true
-			if (other == null || other.javaClass != this.javaClass) return false
-			val that = other as DataPlusType
-			return type == that.type &&
-					data.contentEquals(that.data)
-		}
-
-		override fun hashCode(): Int {
-			return Objects.hash(type, data.contentHashCode())
-		}
-
-		override fun toString(): String {
-			return "DataPlusType[" +
-					"type=" + type + ", " +
-					"data=" + data.contentToString() + ']'
-		}
-	}
 
 	var handle: ((Byte, ByteArray) -> Unit)? = null
 		set(handle) {
@@ -37,7 +17,7 @@ class Connector(
 			if (handle != null) for (dpt in packets) handle(dpt.type, dpt.data)
 		}
 
-	private val packets: MutableList<DataPlusType>
+	private val packets: MutableList<Packet>
 
 	var handleDisabled = false
 		private set
@@ -73,11 +53,11 @@ class Connector(
 			val type = data[0]
 			val dat = ByteArray(data.size - 1)
 			System.arraycopy(data, 1, dat, 0, dat.size)
-			if (handle != null) handle?.let { it(type, dat) } else packets.add(DataPlusType(type, dat))
+			if (handle != null) handle?.let { it(type, dat) } else packets.add(Packet(type, dat))
 		}
 	}
 
-	val packet: DataPlusType?
+	val packet: Packet?
 		get() = if (availablePackets() > 0) packets.removeAt(0) else null
 
 	@Throws(SocketException::class)
