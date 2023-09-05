@@ -25,8 +25,6 @@ import java.util.logging.Level
 import java.util.logging.Logger
 import javax.crypto.interfaces.DHPublicKey
 
-private const val secureSocket = "Secure Socket"
-
 open class Socket : Socket {
 
 	private val logger: Logger
@@ -153,7 +151,7 @@ open class Socket : Socket {
 			Updater.add(Runnable {
 				if (System.currentTimeMillis() - lastInitStageTime.get() > 2000) try {
 					close()
-					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize")
+					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize initCheck${hashCode()}")
 					removeUpdater("InitCheck" + hashCode())
 				} catch (e: IOException) {
 					logger.log(Level.WARNING, secureSocket, e)
@@ -241,5 +239,9 @@ open class Socket : Socket {
 		bb.put(pubKeyEnc)
 		bb.asIntBuffer().put(supportedVersions)
 		sendInternalData((-2).toByte(), bb.array())
+	}
+
+	companion object {
+		private const val secureSocket = "Secure Socket"
 	}
 }

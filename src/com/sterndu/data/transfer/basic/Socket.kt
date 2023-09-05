@@ -20,12 +20,6 @@ import java.util.logging.Level
 import java.util.logging.Logger
 import kotlin.collections.ArrayList
 
-private const val basicSocket = "Basic Socket"
-
-private const val socketAlreadyClosed = "Socket already closed"
-
-private const val socketClosed = "Socket closed!"
-
 open class Socket : DatatransferSocket {
 
 	private val logger: Logger
@@ -550,5 +544,13 @@ open class Socket : DatatransferSocket {
 		set(value) {
 			super.shutdownHook = value
 		}
+
+	companion object {
+		private const val basicSocket = "Basic Socket"
+
+		private const val socketAlreadyClosed = "Socket already closed"
+
+		private const val socketClosed = "Socket closed!"
+	}
 
 }
