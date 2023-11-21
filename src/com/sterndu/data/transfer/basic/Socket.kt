@@ -379,7 +379,7 @@ open class Socket : DatatransferSocket {
 	 * @throws SocketException the socket exception
 	 */
 	@Throws(SocketException::class)
-	fun requestResend() {
+	fun requestResend() {//TODO not implemented
 		sendInternalData(0.toByte(), ByteArray(0))
 	}
 
