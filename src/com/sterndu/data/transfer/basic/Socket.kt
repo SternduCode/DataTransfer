@@ -503,6 +503,10 @@ open class Socket : DatatransferSocket {
 		}
 	}
 
+	private fun equalsOrNull(other: Class<*>?, clazz: Class<*>): Boolean {
+		return other == null || clazz == other
+	}
+
 	/**
 	 * Sets the handle.
 	 *
@@ -513,8 +517,8 @@ open class Socket : DatatransferSocket {
 	fun setHandle(type: Byte, handle: ((Byte, ByteArray) -> Unit)?): Boolean {
 		return try {
 			synchronized(this) {
-				val caller = Class.forName(Thread.currentThread().stackTrace[2].className)
-				if (handles[type]?.first == caller) {
+				val caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).callerClass
+				if (equalsOrNull(handles[type]?.first, caller)) {
 					if (handle != null) {
 						if (!handles.containsKey(type)) {
 							val it = recvVector.iterator()
