@@ -9,14 +9,9 @@ import com.sterndu.encryption.DiffieHellman
 import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import java.io.IOException
-import java.net.InetAddress
-import java.net.SocketException
-import java.net.UnknownHostException
+import java.net.*
 import java.nio.ByteBuffer
-import java.security.InvalidAlgorithmParameterException
-import java.security.InvalidKeyException
-import java.security.KeyFactory
-import java.security.NoSuchAlgorithmException
+import java.security.*
 import java.security.spec.InvalidKeySpecException
 import java.security.spec.X509EncodedKeySpec
 import java.util.*
@@ -27,7 +22,7 @@ import javax.crypto.interfaces.DHPublicKey
 
 open class Socket : Socket {
 
-	private val logger: Logger
+	private var logger: Logger = LoggingUtil.getLogger(secureSocket)
 
 	var dH: DiffieHellman? = null
 		protected set
@@ -38,9 +33,7 @@ open class Socket : Socket {
 	/**
 	 * Instantiates a new socket.
 	 */
-	constructor() {
-		logger = LoggingUtil.getLogger(secureSocket)
-	}
+	constructor()
 
 	/**
 	 * Instantiates a new socket.
@@ -50,9 +43,7 @@ open class Socket : Socket {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
-	constructor(address: InetAddress, port: Int) : super(address, port) {
-		logger = LoggingUtil.getLogger(secureSocket)
-	}
+	constructor(address: InetAddress, port: Int) : super(address, port)
 
 	/**
 	 * Instantiates a new socket.
@@ -69,9 +60,7 @@ open class Socket : Socket {
 		port,
 		localAddr,
 		localPort
-	) {
-		logger = LoggingUtil.getLogger(secureSocket)
-	}
+	)
 
 	/**
 	 * Instantiates a new socket.
@@ -82,9 +71,7 @@ open class Socket : Socket {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class, UnknownHostException::class)
-	constructor(host: String, port: Int) : super(host, port) {
-		logger = LoggingUtil.getLogger(secureSocket)
-	}
+	constructor(host: String, port: Int) : super(host, port)
 
 	/**
 	 * Instantiates a new socket.
@@ -101,9 +88,7 @@ open class Socket : Socket {
 		port,
 		localAddr,
 		localPort
-	) {
-		logger = LoggingUtil.getLogger(secureSocket)
-	}
+	)
 
 	/**
 	 * Impl recieve data.
@@ -143,22 +128,26 @@ open class Socket : Socket {
 	 * @param host the host
 	 */
 	override fun init(host: Boolean) {
+		if (logger == null)
+			logger = LoggingUtil.getLogger(secureSocket)
 		try {
 			isHost = host
 			initialized = false
 			dH = DiffieHellman()
 			val lastInitStageTime = AtomicLong(System.currentTimeMillis())
 			Updater.add(Runnable {
-				if (System.currentTimeMillis() - lastInitStageTime.get() > 2000) try {
+				if (System.currentTimeMillis() - lastInitStageTime.get() > 5000) try {
 					close()
-					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize initCheck${hashCode()}")
-					removeUpdater("InitCheck" + hashCode())
+					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize initCheck${appendix}")
+					removeUpdater("InitCheck" + appendix)
+					Updater.printAll(logger)
 				} catch (e: IOException) {
 					logger.log(Level.WARNING, secureSocket, e)
 				}
-			}, "InitCheck" + hashCode())
+			}, "InitCheck" + appendix)
 			setHandle((-2).toByte()) { type: Byte, data: ByteArray ->
 				try {
+					lastInitStageTime.set(System.currentTimeMillis())
 					var bb = ByteBuffer.wrap(data)
 					val keyLength = bb.getInt()
 					val keyData = ByteArray(keyLength)
@@ -168,7 +157,7 @@ open class Socket : Socket {
 					while (ib.hasRemaining()) li.add(ib.get())
 					li.retainAll(supportedVersions.toSet())
 					li.sort()
-					initialized = false
+					lastInitStageTime.set(System.currentTimeMillis())
 					dH!!.startHandshake()
 					val kf = KeyFactory.getInstance("DiffieHellman")
 					val key = kf.generatePublic(X509EncodedKeySpec(keyData)) as DHPublicKey
@@ -183,7 +172,7 @@ open class Socket : Socket {
 					crypter = getByVersion(li.last())!!
 					crypter!!.makeKey(dH!!.getSecret()!!)
 					initialized = true
-					removeUpdater("InitCheck" + hashCode())
+					removeUpdater("InitCheck" + appendix)
 				} catch (e: NoSuchAlgorithmException) {
 					logger.log(Level.WARNING, secureSocket, e)
 				} catch (e: InvalidKeySpecException) {
@@ -208,7 +197,7 @@ open class Socket : Socket {
 					dH!!.doPhase(key, true)
 					crypter!!.makeKey(dH!!.getSecret()!!)
 					initialized = true
-					removeUpdater("InitCheck" + hashCode())
+					removeUpdater("InitCheck" + appendix)
 				} catch (e: NoSuchAlgorithmException) {
 					logger.log(Level.WARNING, secureSocket, e)
 				} catch (e: InvalidKeySpecException) {

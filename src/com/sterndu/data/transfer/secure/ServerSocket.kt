@@ -18,7 +18,13 @@ class ServerSocket : ServerSocket {
 	@Throws(IOException::class)
 	override fun accept(): Socket {
 		val s = Socket()
-		super.implAccept(s)
+		try {
+			super.implAccept(s)
+		} catch (e: IOException) {
+			s.close()
+			com.sterndu.data.transfer.basic.Socket.allSockets.removeAll { (sock, _) -> sock === s }
+			throw e
+		}
 		s.internalInit(true)
 		return s
 	}

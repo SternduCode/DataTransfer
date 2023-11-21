@@ -18,7 +18,13 @@ open class ServerSocket : DatatransferServerSocket {
 	@Throws(IOException::class)
 	override fun accept(): Socket {
 		val s = Socket()
-		super.implAccept(s)
+		try {
+			super.implAccept(s)
+		} catch (e: IOException) {
+			s.close()
+			Socket.allSockets.removeAll { (sock, _) -> sock === s }
+            throw e
+		}
 		s.internalInit(true)
 		return s
 	}
