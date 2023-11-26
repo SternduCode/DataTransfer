@@ -21,7 +21,9 @@ open class ServerSocket : DatatransferServerSocket {
 		try {
 			super.implAccept(s)
 		} catch (e: IOException) {
-			s.close()
+			if (s.isBound && !s.isClosed) {
+				s.close()
+			}
 			Socket.allSockets.removeAll { (sock, _) -> sock === s }
             throw e
 		}

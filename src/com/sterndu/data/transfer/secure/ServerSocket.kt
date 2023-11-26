@@ -21,7 +21,9 @@ class ServerSocket : ServerSocket {
 		try {
 			super.implAccept(s)
 		} catch (e: IOException) {
-			s.close()
+			if (s.isBound && !s.isClosed) {
+				s.close()
+			}
 			com.sterndu.data.transfer.basic.Socket.allSockets.removeAll { (sock, _) -> sock === s }
 			throw e
 		}
