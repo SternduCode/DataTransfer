@@ -1,9 +1,11 @@
 package com.sterndu.data.transfer;
 
+import com.sterndu.data.transfer.secure.ServerSocket;
+import com.sterndu.data.transfer.secure.Socket;
+
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.*;
-import com.sterndu.data.transfer.secure.*;
+import java.util.function.BiConsumer;
 
 public class SecureConnectionUtil {
 
@@ -15,14 +17,12 @@ public class SecureConnectionUtil {
 			AtomicBoolean cTACL = new AtomicBoolean(closeThreadAfterConnectionLost);
 			if (parallelConnections) for (int i = 0; i < connections; i++) {
 				Socket c = hc.accept();
-				if (c == null) continue;
 				Thread t = new Thread(() -> method.accept(c, hc), i + "-Host");
 				t.setDaemon(false);
 				t.start();
 			}
 			else do {
 				Socket c = hc.accept();
-				if (c == null) continue;
 				Thread t2 = new Thread(() -> method.accept(c, hc), "0-Host");
 				t2.setDaemon(false);
 				t2.start();

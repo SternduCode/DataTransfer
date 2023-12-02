@@ -28,7 +28,7 @@ class Connector(
 	}
 
 	/**
-	 * Available packeets.
+	 * Available packets.
 	 *
 	 * @return the int
 	 */

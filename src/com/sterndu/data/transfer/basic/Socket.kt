@@ -1,16 +1,14 @@
 @file:JvmName("Socket")
 package com.sterndu.data.transfer.basic
 
-import com.sterndu.data.transfer.DatatransferSocket
+import com.sterndu.data.transfer.DataTransferSocket
 import com.sterndu.data.transfer.Packet
 import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import com.sterndu.util.interfaces.ThrowingRunnable
 import com.sterndu.util.readXBytes
 import java.io.IOException
-import java.net.InetAddress
-import java.net.SocketException
-import java.net.UnknownHostException
+import java.net.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -18,9 +16,8 @@ import java.security.NoSuchAlgorithmException
 import java.util.*
 import java.util.logging.Level
 import java.util.logging.Logger
-import kotlin.collections.ArrayList
 
-open class Socket : DatatransferSocket {
+open class Socket : DataTransferSocket {
 
 	protected lateinit var appendix: String
 
@@ -189,7 +186,7 @@ open class Socket : DatatransferSocket {
 		Updater.add(ThrowingRunnable {
 			if (!isClosed && inputStream.available() > 0) try {
 				val data = receiveData()
-				if (handles.containsKey(data.type)) getHandle(data.type)!!(data.type, data.data) else recvVector.add(data)
+				if (handles.containsKey(data.type)) getHandle(data.type)!!(data.type, data.data) else receiveQueue.add(data)
 			} catch (e: IOException) {
 				logger.log(Level.WARNING, basicSocket, e)
 			}
@@ -197,7 +194,7 @@ open class Socket : DatatransferSocket {
 				val (type, data1) = delayedSend.removeAt(0)
 				sendData(type, data1)
 			}
-		}, "CheckForMsgs" + appendix)
+		}, "CheckForMsgs $appendix")
 		Updater.add(ThrowingRunnable {
 			if (!isClosed) {
 				if (pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
@@ -210,7 +207,7 @@ open class Socket : DatatransferSocket {
 					close()
 				}
 			}
-		}, "PingKill" + appendix)
+		}, "PingKill $appendix")
 	}
 
 	fun name(withClassName: Boolean = false) = if (withClassName) "${javaClass.simpleName} ${inetAddress}:${port}" else "${inetAddress}:${port}"
@@ -347,11 +344,11 @@ open class Socket : DatatransferSocket {
 	}
 
 	val messageCount: Int
-		get() = recvVector.size
+		get() = receiveQueue.size
 	val messageFromBuffer: Packet
 		get() {
-			if (recvVector.isEmpty()) throw EmptyStackException()
-			return recvVector.removeAt(0)
+			if (receiveQueue.isEmpty()) throw EmptyStackException()
+			return receiveQueue.removeFirst()
 		}
 
 	/**
@@ -370,7 +367,7 @@ open class Socket : DatatransferSocket {
 	 * @return true, if successful
 	 */
 	fun hasMessage(): Boolean {
-		return recvVector.isNotEmpty()
+		return receiveQueue.isNotEmpty()
 	}
 
 	/**
@@ -428,7 +425,7 @@ open class Socket : DatatransferSocket {
 			} else {
 				disablePeriodicPing()
 			}
-		}, "Ping" + appendix, millis)
+		}, "Ping $appendix", millis)
 		Thread {
 			internalPing()
 		}.start()
@@ -445,7 +442,7 @@ open class Socket : DatatransferSocket {
 			} else {
 				disablePeriodicPing()
 			}
-		}, "Ping" + appendix, millis)
+		}, "Ping $appendix", millis)
 		Thread {
 			ping()
 		}.start()
@@ -521,7 +518,7 @@ open class Socket : DatatransferSocket {
 				if (equalsOrNull(handles[type]?.first, caller)) {
 					if (handle != null) {
 						if (!handles.containsKey(type)) {
-							val it = recvVector.iterator()
+							val it = receiveQueue.iterator()
 							it.forEach { (type1, data) ->
 								if (type1 == type) {
 									handle(type1, data)
@@ -541,7 +538,7 @@ open class Socket : DatatransferSocket {
 		}
 	}
 
-	override var shutdownHook: (DatatransferSocket) -> Unit
+	override var shutdownHook: (DataTransferSocket) -> Unit
 		get() = super.shutdownHook
 		set(value) {
 			super.shutdownHook = value
@@ -554,7 +551,7 @@ open class Socket : DatatransferSocket {
 
 		private const val socketClosed = "Socket closed!"
 
-		val allSockets = Collections.synchronizedList(ArrayList<Pair<Socket, Array<StackTraceElement>>>())
+		val allSockets: MutableList<Pair<Socket, Array<StackTraceElement>>> = Collections.synchronizedList(ArrayList<Pair<Socket, Array<StackTraceElement>>>())
 	}
 
 }

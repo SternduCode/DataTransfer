@@ -1,12 +1,10 @@
-@file:JvmName("DatatransferServerSocket")
+@file:JvmName("DataTransferServerSocket")
 package com.sterndu.data.transfer
 
 import java.io.IOException
-import java.net.InetAddress
-import java.net.ServerSocket
-import java.net.Socket
+import java.net.*
 
-abstract class DatatransferServerSocket : ServerSocket {
+abstract class DataTransferServerSocket : ServerSocket {
 
 	@Throws(IOException::class)
 	constructor()

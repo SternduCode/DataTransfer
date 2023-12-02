@@ -22,38 +22,17 @@ import javax.crypto.interfaces.DHPublicKey
 
 open class Socket : Socket {
 
-	private var logger: Logger = LoggingUtil.getLogger(secureSocket)
+	private var logger: Logger = LoggingUtil.getLogger(SECURE_SOCKET)
 
-	var dH: DiffieHellman? = null
-		protected set
+	protected var dH: DiffieHellman? = null
 
-	/** The crypter.  */
 	protected var crypter: Crypter? = null
 
-	/**
-	 * Instantiates a new socket.
-	 */
 	constructor()
 
-	/**
-	 * Instantiates a new socket.
-	 *
-	 * @param address the address
-	 * @param port the port
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 */
 	@Throws(IOException::class)
 	constructor(address: InetAddress, port: Int) : super(address, port)
 
-	/**
-	 * Instantiates a new socket.
-	 *
-	 * @param address the address
-	 * @param port the port
-	 * @param localAddr the local addr
-	 * @param localPort the local port
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 */
 	@Throws(IOException::class)
 	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int) : super(
 		address,
@@ -62,26 +41,9 @@ open class Socket : Socket {
 		localPort
 	)
 
-	/**
-	 * Instantiates a new socket.
-	 *
-	 * @param host the host
-	 * @param port the port
-	 * @throws UnknownHostException the unknown host exception
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 */
 	@Throws(IOException::class, UnknownHostException::class)
 	constructor(host: String, port: Int) : super(host, port)
 
-	/**
-	 * Instantiates a new socket.
-	 *
-	 * @param host the host
-	 * @param port the port
-	 * @param localAddr the local addr
-	 * @param localPort the local port
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 */
 	@Throws(IOException::class)
 	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int) : super(
 		host,
@@ -91,7 +53,7 @@ open class Socket : Socket {
 	)
 
 	/**
-	 * Impl recieve data.
+	 * Receive data implementation, handles transformations of data after it is received.
 	 *
 	 * @param type the type
 	 * @param data the data
@@ -105,7 +67,7 @@ open class Socket : Socket {
 	}
 
 	/**
-	 * Impl send data.
+	 * Send data implementation, handles transformations of data before it is sent
 	 *
 	 * @param type the type
 	 * @param data the data
@@ -123,13 +85,11 @@ open class Socket : Socket {
 	}
 
 	/**
-	 * Inits the.
-	 *
 	 * @param host the host
 	 */
 	override fun init(host: Boolean) {
 		if (logger == null)
-			logger = LoggingUtil.getLogger(secureSocket)
+			logger = LoggingUtil.getLogger(SECURE_SOCKET)
 		try {
 			isHost = host
 			initialized = false
@@ -138,14 +98,14 @@ open class Socket : Socket {
 			Updater.add(Runnable {
 				if (System.currentTimeMillis() - lastInitStageTime.get() > 5000) try {
 					close()
-					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize initCheck${appendix}")
-					removeUpdater("InitCheck" + appendix)
+					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize initCheck $appendix")
+					removeUpdater("InitCheck $appendix")
 					Updater.printAll(logger)
 				} catch (e: IOException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				}
-			}, "InitCheck" + appendix)
-			setHandle((-2).toByte()) { type: Byte, data: ByteArray ->
+			}, "InitCheck $appendix")
+			setHandle((-2).toByte()) { _: Byte, data: ByteArray ->
 				try {
 					lastInitStageTime.set(System.currentTimeMillis())
 					var bb = ByteBuffer.wrap(data)
@@ -172,20 +132,20 @@ open class Socket : Socket {
 					crypter = getByVersion(li.last())!!
 					crypter!!.makeKey(dH!!.getSecret()!!)
 					initialized = true
-					removeUpdater("InitCheck" + appendix)
+					removeUpdater("InitCheck $appendix")
 				} catch (e: NoSuchAlgorithmException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				} catch (e: InvalidKeySpecException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				} catch (e: InvalidAlgorithmParameterException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				} catch (e: SocketException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				} catch (e: InvalidKeyException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				}
 			} // Test reduced number of calls && add hashing list avail stuff && add option to disable double hashing
-			setHandle((-3).toByte()) { type: Byte, data: ByteArray ->
+			setHandle((-3).toByte()) { _: Byte, data: ByteArray ->
 				try {
 					lastInitStageTime.set(System.currentTimeMillis())
 					val bb = ByteBuffer.wrap(data)
@@ -197,19 +157,19 @@ open class Socket : Socket {
 					dH!!.doPhase(key, true)
 					crypter!!.makeKey(dH!!.getSecret()!!)
 					initialized = true
-					removeUpdater("InitCheck" + appendix)
+					removeUpdater("InitCheck $appendix")
 				} catch (e: NoSuchAlgorithmException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				} catch (e: InvalidKeySpecException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				} catch (e: InvalidKeyException) {
-					logger.log(Level.WARNING, secureSocket, e)
+					logger.log(Level.WARNING, SECURE_SOCKET, e)
 				}
 			}
 			super.init(host)
 			if (host) startHandshake()
 		} catch (e: SocketException) {
-			logger.log(Level.WARNING, secureSocket, e)
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
 		}
 	}
 
@@ -231,6 +191,6 @@ open class Socket : Socket {
 	}
 
 	companion object {
-		private const val secureSocket = "Secure Socket"
+		private const val SECURE_SOCKET = "Secure Socket"
 	}
 }

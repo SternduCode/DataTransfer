@@ -1,11 +1,11 @@
 @file:JvmName("ServerSocket")
 package com.sterndu.data.transfer.basic
 
-import com.sterndu.data.transfer.DatatransferServerSocket
+import com.sterndu.data.transfer.DataTransferServerSocket
 import java.io.IOException
 import java.net.InetAddress
 
-open class ServerSocket : DatatransferServerSocket {
+open class ServerSocket : DataTransferServerSocket {
 	@Throws(IOException::class)
 	constructor()
 	@Throws(IOException::class)
