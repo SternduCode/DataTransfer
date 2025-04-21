@@ -14,17 +14,15 @@ import java.nio.ByteBuffer
 import java.security.*
 import java.security.spec.InvalidKeySpecException
 import java.security.spec.X509EncodedKeySpec
-import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 import java.util.logging.Level
 import java.util.logging.Logger
-import javax.crypto.interfaces.DHPublicKey
 
 open class Socket : Socket {
 
 	private var logger: Logger = LoggingUtil.getLogger(SECURE_SOCKET)
 
-	protected var dH: DiffieHellman? = null
+	protected lateinit var dH: DiffieHellman
 
 	protected var crypter: Crypter? = null
 
@@ -106,65 +104,10 @@ open class Socket : Socket {
 				}
 			}, "InitCheck $appendix")
 			setHandle((-2).toByte()) { _: Byte, data: ByteArray ->
-				try {
-					lastInitStageTime.set(System.currentTimeMillis())
-					var bb = ByteBuffer.wrap(data)
-					val keyLength = bb.getInt()
-					val keyData = ByteArray(keyLength)
-					bb[keyData]
-					val ib = bb.asIntBuffer()
-					val li: MutableList<Int> = ArrayList()
-					while (ib.hasRemaining()) li.add(ib.get())
-					li.retainAll(supportedVersions.toSet())
-					li.sort()
-					lastInitStageTime.set(System.currentTimeMillis())
-					dH!!.startHandshake()
-					val kf = KeyFactory.getInstance("DiffieHellman")
-					val key = kf.generatePublic(X509EncodedKeySpec(keyData)) as DHPublicKey
-					dH!!.initialize(key.params)
-					dH!!.doPhase(key, true)
-					lastInitStageTime.set(System.currentTimeMillis())
-					val pubKeyEnc = dH!!.publicKey.encoded
-					bb = ByteBuffer.allocate(4 + pubKeyEnc.size)
-					bb.putInt(li.last())
-					bb.put(pubKeyEnc)
-					sendInternalData((-3).toByte(), bb.array())
-					crypter = getByVersion(li.last())!!
-					crypter!!.makeKey(dH!!.getSecret()!!)
-					initialized = true
-					removeUpdater("InitCheck $appendix")
-				} catch (e: NoSuchAlgorithmException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				} catch (e: InvalidKeySpecException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				} catch (e: InvalidAlgorithmParameterException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				} catch (e: SocketException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				} catch (e: InvalidKeyException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				}
+				initPhase1(data, lastInitStageTime)
 			} // Test reduced number of calls && add hashing list avail stuff && add option to disable double hashing
 			setHandle((-3).toByte()) { _: Byte, data: ByteArray ->
-				try {
-					lastInitStageTime.set(System.currentTimeMillis())
-					val bb = ByteBuffer.wrap(data)
-					crypter = getByVersion(bb.getInt())!!
-					val keyData = ByteArray(data.size - 4)
-					bb[keyData]
-					val kf = KeyFactory.getInstance("DiffieHellman")
-					val key = kf.generatePublic(X509EncodedKeySpec(keyData)) as DHPublicKey
-					dH!!.doPhase(key, true)
-					crypter!!.makeKey(dH!!.getSecret()!!)
-					initialized = true
-					removeUpdater("InitCheck $appendix")
-				} catch (e: NoSuchAlgorithmException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				} catch (e: InvalidKeySpecException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				} catch (e: InvalidKeyException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				}
+				initPhase2(data, lastInitStageTime)
 			}
 			super.init(host)
 			if (host) startHandshake()
@@ -173,21 +116,85 @@ open class Socket : Socket {
 		}
 	}
 
-	/**
-	 * Start handshake.
-	 *
-	 * @throws SocketException the socket exception
-	 */
 	@Throws(SocketException::class)
 	fun startHandshake() {
 		initialized = false
-		dH!!.startHandshake()
-		val pubKeyEnc = dH!!.publicKey.encoded
-		val bb = ByteBuffer.allocate(4 + pubKeyEnc.size + 4 * supportedVersions.size)
+		dH.startHandshake()
+		val pubKeyEnc = dH.publicKey?.encoded ?: throw Exception("Initialization failed")
+		val bb = ByteBuffer.allocate(4 + pubKeyEnc.size + 2 * CrypterProvider.availableCryptersCodes.size)
 		bb.putInt(pubKeyEnc.size)
 		bb.put(pubKeyEnc)
-		bb.asIntBuffer().put(supportedVersions)
+		bb.asShortBuffer().put(CrypterProvider.availableCryptersCodes)
 		sendInternalData((-2).toByte(), bb.array())
+	}
+
+	private fun initPhase1(data: ByteArray, lastInitStageTime: AtomicLong) {
+		try {
+			lastInitStageTime.set(System.currentTimeMillis())
+			var bb = ByteBuffer.wrap(data)
+			val keyLength = bb.getInt()
+			val keyData = ByteArray(keyLength)
+			bb[keyData]
+			val shortBuffer = bb.asShortBuffer()
+			val li: MutableList<Short> = ArrayList()
+			while (shortBuffer.hasRemaining()) li.add(shortBuffer.get())
+			li.retainAll(CrypterProvider.availableCryptersCodes.toSet())
+			li.sort()
+			lastInitStageTime.set(System.currentTimeMillis())
+			if (System.getProperty("debug") == "true") println("FFS2")
+			val kf = KeyFactory.getInstance("X25519")
+			val key = kf.generatePublic(X509EncodedKeySpec(keyData))
+			if (System.getProperty("debug") == "true") println("FFS3 $key")
+			dH.startHandshake()
+			if (System.getProperty("debug") == "true") println("FFS4")
+			dH.doPhase(key, true)
+			if (System.getProperty("debug") == "true") println("FFS5")
+			lastInitStageTime.set(System.currentTimeMillis())
+			val pubKeyEnc = dH.publicKey?.encoded ?: throw Exception("KeyExchange is not fully completed! No PublicKey available")
+			if (System.getProperty("debug") == "true") println("FFS6")
+			bb = ByteBuffer.allocate(2 + pubKeyEnc.size)
+			bb.putShort(li.last())
+			bb.put(pubKeyEnc)
+			sendInternalData((-3).toByte(), bb.array())
+			crypter = CrypterProvider.getCrypterByCode(li.last())!!
+			crypter!!.makeKey(dH.getSecret()!!)
+			initialized = true
+			removeUpdater("InitCheck $appendix")
+		} catch (e: NoSuchAlgorithmException) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		} catch (e: InvalidKeySpecException) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		} catch (e: InvalidAlgorithmParameterException) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		} catch (e: SocketException) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		} catch (e: InvalidKeyException) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		} catch (e: Exception) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		}
+	}
+
+	private fun initPhase2(data: ByteArray, lastInitStageTime: AtomicLong) {
+		try {
+			lastInitStageTime.set(System.currentTimeMillis())
+			val bb = ByteBuffer.wrap(data)
+			crypter = CrypterProvider.getCrypterByCode(bb.getShort())!!
+			val keyData = ByteArray(data.size - 2)
+			bb[keyData]
+			val kf = KeyFactory.getInstance("X25519")
+			val key = kf.generatePublic(X509EncodedKeySpec(keyData)) as PublicKey
+			dH.doPhase(key, true)
+			crypter!!.makeKey(dH.getSecret()!!)
+			initialized = true
+			removeUpdater("InitCheck $appendix")
+		} catch (e: NoSuchAlgorithmException) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		} catch (e: InvalidKeySpecException) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		} catch (e: InvalidKeyException) {
+			logger.log(Level.WARNING, SECURE_SOCKET, e)
+		}
 	}
 
 	companion object {
