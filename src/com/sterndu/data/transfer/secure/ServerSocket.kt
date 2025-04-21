@@ -24,7 +24,7 @@ class ServerSocket : ServerSocket {
 			if (s.isBound && !s.isClosed) {
 				s.close()
 			}
-			com.sterndu.data.transfer.basic.Socket.allSockets.removeAll { (sock, _) -> sock === s }
+			com.sterndu.data.transfer.basic.Socket.allSockets.remove(s)
 			throw e
 		}
 		s.internalInit(true)

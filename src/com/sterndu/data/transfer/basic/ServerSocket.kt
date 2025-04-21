@@ -24,7 +24,7 @@ open class ServerSocket : DataTransferServerSocket {
 			if (s.isBound && !s.isClosed) {
 				s.close()
 			}
-			Socket.allSockets.removeAll { (sock, _) -> sock === s }
+			Socket.allSockets.remove(s)
             throw e
 		}
 		s.internalInit(true)

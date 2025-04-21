@@ -25,6 +25,10 @@ open class Socket : DataTransferSocket {
 
 	protected lateinit var appendix: String
 
+	private var packetCounterSend: Short = 0
+	private var packetCounterReceive: Short = 0
+	private val resendList = HashMap<Short, Packet>()
+
 	private var logger: Logger = LoggingUtil.getLogger(basicSocket)
 
 	open var isHost = false
@@ -41,7 +45,7 @@ open class Socket : DataTransferSocket {
 	 *
 	 */
 	constructor() {
-		allSockets.add(this to Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) })
+		allSockets[this] = Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) }
 	}
 
 	/**
@@ -53,8 +57,8 @@ open class Socket : DataTransferSocket {
 	 */
 	@Throws(IOException::class)
 	constructor(address: InetAddress, port: Int) : super(address, port) {
-		allSockets.add(this to Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) })
-		appendix = "$inetAddress:$port -> $localAddress:$localPort"
+		allSockets[this] = Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) }
+		appendix = "$inetAddress:$port -- $localAddress:$localPort".replace("/", "").replace(":", "-")
 		init(false)
 	}
 
@@ -74,8 +78,8 @@ open class Socket : DataTransferSocket {
 		localAddr,
 		localPort
 	) {
-		allSockets.add(this to Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) })
-		appendix = "$inetAddress:$port -> $localAddress:$localPort"
+		allSockets[this] = Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) }
+		appendix = "$inetAddress:$port -- $localAddress:$localPort".replace("/", "").replace(":", "-")
 		init(false)
 	}
 
@@ -89,8 +93,8 @@ open class Socket : DataTransferSocket {
 	 */
 	@Throws(IOException::class, UnknownHostException::class)
 	constructor(host: String, port: Int) : super(host, port) {
-		allSockets.add(this to Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) })
-		appendix = "$inetAddress:$port -> $localAddress:$localPort"
+		allSockets[this] = Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) }
+		appendix = "$inetAddress:$port -- $localAddress:$localPort".replace("/", "").replace(":", "-")
 		init(false)
 	}
 
@@ -110,8 +114,8 @@ open class Socket : DataTransferSocket {
 		localAddr,
 		localPort
 	) {
-		allSockets.add(this to Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) })
-		appendix = "$inetAddress:$port -> $localAddress:$localPort"
+		allSockets[this] = Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) }
+		appendix = "$inetAddress:$port -- $localAddress:$localPort".replace("/", "").replace(":", "-")
 		init(false)
 	}
 
@@ -145,7 +149,7 @@ open class Socket : DataTransferSocket {
 	}
 
 	internal fun internalInit(host: Boolean) {
-		appendix = "$inetAddress:$port -> $localAddress:$localPort"
+		appendix = "$inetAddress:$port -- $localAddress:$localPort".replace("/", "").replace(":", "-")
 		init(host)
 	}
 
@@ -195,21 +199,19 @@ open class Socket : DataTransferSocket {
 				logger.log(Level.WARNING, basicSocket, e)
 			}
 			if (delayedSend.isNotEmpty() && initialized && !isClosed) {
-				val (type, data1) = delayedSend.removeAt(0)
-				sendData(type, data1)
+				val (type, data) = delayedSend.removeAt(0)
+				sendData(type, data)
 			}
 		}, "CheckForMsgs $appendix")
 		Updater.add(ThrowingRunnable {
-			if (!isClosed) {
-				if (pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
-					try {
-						sendClose()
-					} catch (e: SocketException) {
-						logger.finer(socketAlreadyClosed)
-						disablePeriodicPing()
-					}
-					close()
+			if (!isClosed && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
+				try {
+					sendClose()
+				} catch (e: SocketException) {
+					logger.finer(socketAlreadyClosed)
+					disablePeriodicPing()
 				}
+				close()
 			}
 		}, "PingKill $appendix")
 	}
@@ -259,9 +261,9 @@ open class Socket : DataTransferSocket {
 
 	private fun logReceiveState(type: Byte, state: Char, length: Int, data: ByteArray, hash: ByteArray) {
 		if (state == 'r')
-			logger.finest(type.toString() + "$type $state[length: $length,data: ${data.contentToString()},hash: ${hash.contentToString()}")
+			logger.finest("$type $state[length: $length,data: ${data.contentToString()},hash: ${hash.contentToString()}")
 		else
-			logger.fine(type.toString() + "$type $state[length: $length,data: ${data.contentToString()},hash: ${hash.contentToString()}")
+			logger.fine("$type $state[length: $length,data: ${data.contentToString()},hash: ${hash.contentToString()}")
 	}
 
 	/**
@@ -279,7 +281,7 @@ open class Socket : DataTransferSocket {
 			sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
 
 			if (isClosed) throw SocketException(socketClosed)
-			val modifiedData = implSendData(type, data)
+			val modifiedData = data
 			val hash = md!!.digest(modifiedData)
 			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
 			try {
@@ -315,6 +317,8 @@ open class Socket : DataTransferSocket {
 	 */
 	@Throws(IOException::class, SocketException::class)
 	override fun close() {
+		if (logger == null)
+			logger = LoggingUtil.getLogger(basicSocket)
 		logger.fine("close $this ${Thread.currentThread().stackTrace.contentToString()}")
 		try {
 			var recvStamp = 0L
@@ -342,16 +346,18 @@ open class Socket : DataTransferSocket {
 				sendLock.unlock(sendStamp)
 			}
 		} catch (e: NullPointerException) {
-			Updater.remove("CheckForMsgs" + appendix)
-			Updater.remove("PingKill" + appendix)
-			disablePeriodicPing()
+			if (appendix != null) {
+				Updater.remove("CheckForMsgs $appendix")
+				Updater.remove("PingKill $appendix")
+				disablePeriodicPing()
+			}
 			super.close()
 		}
 	}
 
 	fun disablePeriodicPing() {
-		Updater.remove("Ping" + appendix)
-		Updater.remove("PingKill" + appendix)
+		Updater.remove("Ping $appendix")
+		pingStartTime = 0L
 	}
 
 	/**
@@ -418,7 +424,7 @@ open class Socket : DataTransferSocket {
 				sendData((-127).toByte(), "Ping".toByteArray(Charsets.UTF_8))
 			} catch (e: Exception) {
 				logger.finer(socketAlreadyClosed)
-				Updater.remove("Ping" + appendix)
+				Updater.remove("Ping $appendix")
 			}
 		} finally {
 			pingLock.unlock(pingStamp)
@@ -438,7 +444,7 @@ open class Socket : DataTransferSocket {
 				sendInternalData((-126).toByte(), "Ping".toByteArray(Charsets.UTF_8))
 			} catch (e: Exception) {
 				logger.finer(socketAlreadyClosed)
-				Updater.remove("Ping" + appendix)
+				Updater.remove("Ping $appendix")
 			}
 		} finally {
 			pingLock.unlock(pingStamp)
@@ -486,6 +492,7 @@ open class Socket : DataTransferSocket {
 	 */
 	@Throws(SocketException::class)
 	fun sendClose() {
+		logger.log(Level.WARNING, "send close $appendix $this", Exception("send close"))
 		if (!isClosed && isConnected) sendInternalData((-1).toByte(), ByteArray(0))
 	}
 
@@ -581,13 +588,16 @@ open class Socket : DataTransferSocket {
 		}
 
 	companion object {
+
+		private const val MAX_PACKET_AMOUNT_FOR_RESEND = 10
+
 		private const val basicSocket = "Basic Socket"
 
 		private const val socketAlreadyClosed = "Socket already closed"
 
 		private const val socketClosed = "Socket closed!"
 
-		val allSockets: MutableList<Pair<Socket, Array<StackTraceElement>>> = Collections.synchronizedList(ArrayList<Pair<Socket, Array<StackTraceElement>>>())
+		val allSockets: MutableMap<Socket, Array<StackTraceElement>> = Collections.synchronizedMap(HashMap())
 	}
 
 }
