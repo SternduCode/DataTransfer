@@ -163,7 +163,7 @@ open class Socket : DataTransferSocket {
 			logger = LoggingUtil.getLogger(basicSocket)
 		try {
 			isHost = host
-			md = MessageDigest.getInstance("SHA-256") // SHA3-256
+			md = MessageDigest.getInstance("SHA-512/256") // Better performance than SHA-256
 			setHandle(((-1).toByte())) { _: Byte, _: ByteArray ->
 				try {
 					if (!isClosed) {
