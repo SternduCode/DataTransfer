@@ -2,10 +2,7 @@
 package com.sterndu.data.transfer.secure
 
 import com.sterndu.data.transfer.basic.Socket
-import com.sterndu.encryption.Crypter
-import com.sterndu.encryption.CrypterList.getByVersion
-import com.sterndu.encryption.CrypterList.supportedVersions
-import com.sterndu.encryption.DiffieHellman
+import com.sterndu.encryption.*
 import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import java.io.IOException
@@ -94,7 +91,7 @@ open class Socket : Socket {
 			dH = DiffieHellman()
 			val lastInitStageTime = AtomicLong(System.currentTimeMillis())
 			Updater.add(Runnable {
-				if (System.currentTimeMillis() - lastInitStageTime.get() > 5000) try {
+				if (System.currentTimeMillis() - lastInitStageTime.get() > 15000) try {
 					close()
 					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize initCheck $appendix")
 					removeUpdater("InitCheck $appendix")
