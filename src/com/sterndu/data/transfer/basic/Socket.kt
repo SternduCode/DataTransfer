@@ -7,13 +7,17 @@ import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import com.sterndu.util.interfaces.ThrowingRunnable
 import com.sterndu.util.readXBytes
+import java.io.File
 import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.*
+import java.util.concurrent.locks.StampedLock
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -26,7 +30,7 @@ open class Socket : DataTransferSocket {
 	open var isHost = false
 		protected set
 
-	private val pingLock = Any()
+	private val pingLock = StampedLock()
 
 	private val lastPings = ArrayList<Long>()
 
@@ -221,7 +225,10 @@ open class Socket : DataTransferSocket {
 	@Throws(IOException::class)
 	protected fun receiveData(): Packet {
 		var packet: Packet
-		synchronized(recLock) {
+		var recvStamp = 0L
+		try {
+			recvStamp = recvLock.writeLock() // Get an exclusive lock for receiving
+
 			var b = ByteArray(5)
 			if (readXBytes(b, inputStream, b.size, 5000)) {
 				val type = b[0]
@@ -243,6 +250,8 @@ open class Socket : DataTransferSocket {
 				logger.fine("f" + b.contentToString())
 				return Packet(((-128).toByte()), ByteArray(0))
 			}
+		} finally {
+			recvLock.unlock(recvStamp)
 		}
 		return Packet(packet.type, implReceiveData(packet.type, packet.data))
 		// type byte; length int; data byte[]; hash byte[32];
@@ -265,7 +274,10 @@ open class Socket : DataTransferSocket {
 	@Throws(SocketException::class)
 	protected fun sendInternalData(type: Byte, data: ByteArray) {
 		if (isClosed) throw SocketException(socketClosed)
-		synchronized(sendLock) {
+		var sendStamp = 0L
+		try {
+			sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
+
 			if (isClosed) throw SocketException(socketClosed)
 			val modifiedData = implSendData(type, data)
 			val hash = md!!.digest(modifiedData)
@@ -290,6 +302,8 @@ open class Socket : DataTransferSocket {
 				delayedSend.add(Packet(type, data))
 				return
 			}
+		} finally {
+			sendLock.unlock(sendStamp)
 		}
 	}
 
@@ -303,22 +317,29 @@ open class Socket : DataTransferSocket {
 	override fun close() {
 		logger.fine("close $this ${Thread.currentThread().stackTrace.contentToString()}")
 		try {
-			synchronized(recLock) {
-				synchronized(sendLock) {
-					try {
-						if (!isClosed) {
-							shutdownHook(this)
-							shutdownOutput()
-							shutdownInput()
-							Updater.remove("CheckForMsgs" + appendix)
-							Updater.remove("PingKill" + appendix)
-							disablePeriodicPing()
-							super.close()
-						}
-					} catch (e: SocketException) {
+			var recvStamp = 0L
+			var sendStamp = 0L
+
+			try {
+				recvStamp = recvLock.writeLock() // Get an exclusive lock for receiving
+				sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
+
+				try {
+					if (!isClosed) {
+						shutdownHook(this)
+						shutdownOutput()
+						shutdownInput()
+						Updater.remove("CheckForMsgs $appendix")
+						Updater.remove("PingKill $appendix")
+						disablePeriodicPing()
 						super.close()
 					}
+				} catch (e: SocketException) {
+					super.close()
 				}
+			} finally {
+				recvLock.unlock(recvStamp)
+				sendLock.unlock(sendStamp)
 			}
 		} catch (e: NullPointerException) {
 			Updater.remove("CheckForMsgs" + appendix)
@@ -387,7 +408,10 @@ open class Socket : DataTransferSocket {
 	@Throws(SocketException::class)
 	fun ping() {
 		if (isClosed || !isConnected || !initialized) return
-		synchronized(pingLock) {
+		var pingStamp = 0L
+		try {
+			pingStamp = pingLock.writeLock() // Get an exclusive lock for pinging
+
 			if (isClosed || !isConnected || !initialized) return
 			pingStartTime = System.currentTimeMillis()
 			try {
@@ -396,13 +420,18 @@ open class Socket : DataTransferSocket {
 				logger.finer(socketAlreadyClosed)
 				Updater.remove("Ping" + appendix)
 			}
+		} finally {
+			pingLock.unlock(pingStamp)
 		}
 	}
 
 	@Throws(SocketException::class)
 	fun internalPing() {
 		if (isClosed || !isConnected || !initialized) return
-		synchronized(pingLock) {
+		var pingStamp = 0L
+		try {
+			pingStamp = pingLock.writeLock() // Get an exclusive lock for pinging
+
 			if (isClosed || !isConnected || !initialized) return
 			pingStartTime = System.currentTimeMillis()
 			try {
@@ -411,6 +440,8 @@ open class Socket : DataTransferSocket {
 				logger.finer(socketAlreadyClosed)
 				Updater.remove("Ping" + appendix)
 			}
+		} finally {
+			pingLock.unlock(pingStamp)
 		}
 	}
 
@@ -472,7 +503,10 @@ open class Socket : DataTransferSocket {
 			return
 		}
 		if (isClosed) throw SocketException(socketClosed)
-		synchronized(sendLock) {
+		var sendStamp = 0L
+		try {
+			sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
+
 			if (isClosed) throw SocketException(socketClosed)
 			val modifiedData = implSendData(type, data)
 			val hash = md!!.digest(modifiedData)
@@ -497,6 +531,8 @@ open class Socket : DataTransferSocket {
 				logger.log(Level.WARNING, basicSocket, e)
 				delayedSend.add(Packet(type, data))
 			}
+		} finally {
+			sendLock.unlock(sendStamp)
 		}
 	}
 

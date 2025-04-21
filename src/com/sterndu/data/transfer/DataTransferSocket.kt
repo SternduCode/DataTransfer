@@ -4,8 +4,7 @@ package com.sterndu.data.transfer
 import java.io.IOException
 import java.net.*
 import java.security.MessageDigest
-import java.util.*
-import kotlin.collections.ArrayDeque
+import java.util.concurrent.locks.StampedLock
 
 abstract class DataTransferSocket : Socket {
 
@@ -18,10 +17,9 @@ abstract class DataTransferSocket : Socket {
 	protected var md: MessageDigest? = null
 
 	@JvmField
-	protected var recLock = Any()
+	protected var recvLock = StampedLock()
 	@JvmField
-	protected var sendLock = Any()
-
+	protected var sendLock = StampedLock()
 	@JvmField
 	protected var receiveQueue = ArrayDeque<Packet>()
 
