@@ -2,11 +2,15 @@
 package com.sterndu.data.transfer.secure
 
 import com.sterndu.data.transfer.basic.Socket
-import com.sterndu.encryption.*
+import com.sterndu.encryption.Crypter
+import com.sterndu.encryption.CrypterProvider
+import com.sterndu.encryption.DiffieHellman
 import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import java.io.IOException
-import java.net.*
+import java.net.InetAddress
+import java.net.SocketException
+import java.net.UnknownHostException
 import java.nio.ByteBuffer
 import java.security.*
 import java.security.spec.InvalidKeySpecException
@@ -118,10 +122,10 @@ open class Socket : Socket {
 		initialized = false
 		dH.startHandshake()
 		val pubKeyEnc = dH.publicKey?.encoded ?: throw Exception("Initialization failed")
-		val bb = ByteBuffer.allocate(4 + pubKeyEnc.size + 2 * CrypterProvider.availableCryptersCodes.size)
+		val bb = ByteBuffer.allocate(4 + pubKeyEnc.size + 2 * CrypterProvider.availableCrypterCodes.size)
 		bb.putInt(pubKeyEnc.size)
 		bb.put(pubKeyEnc)
-		bb.asShortBuffer().put(CrypterProvider.availableCryptersCodes)
+		bb.asShortBuffer().put(CrypterProvider.availableCrypterCodes)
 		sendInternalData((-2).toByte(), bb.array())
 	}
 
@@ -135,7 +139,7 @@ open class Socket : Socket {
 			val shortBuffer = bb.asShortBuffer()
 			val li: MutableList<Short> = ArrayList()
 			while (shortBuffer.hasRemaining()) li.add(shortBuffer.get())
-			li.retainAll(CrypterProvider.availableCryptersCodes.toSet())
+			li.retainAll(CrypterProvider.availableCrypterCodes.toSet())
 			li.sort()
 			lastInitStageTime.set(System.currentTimeMillis())
 			if (System.getProperty("debug") == "true") println("FFS2")
