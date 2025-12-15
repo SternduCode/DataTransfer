@@ -11,7 +11,7 @@ java {
 }
 
 kotlin {
-	jvmToolchain(23)
+	jvmToolchain(25)
 	compilerOptions {
 		freeCompilerArgs.add("-Xjvm-default=all")
 	}
