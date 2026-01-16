@@ -17,18 +17,6 @@ import java.util.concurrent.locks.StampedLock
 import java.util.logging.Level
 import java.util.logging.Logger
 import kotlin.collections.ArrayDeque
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
-import kotlin.collections.MutableList
-import kotlin.collections.MutableMap
-import kotlin.collections.average
-import kotlin.collections.forEach
-import kotlin.collections.isNotEmpty
-import kotlin.collections.lastOrNull
-import kotlin.collections.set
-import kotlin.collections.toSet
-import kotlin.text.Charsets
-import kotlin.text.String
 import kotlin.text.toByteArray
 
 abstract class DataTransferClient: Closeable {
@@ -100,11 +88,11 @@ abstract class DataTransferClient: Closeable {
 		if (lastPings.size > 32) lastPings.removeAll(lastPings.subList(0, lastPings.size - 32).toSet())
 	}
 
-	abstract fun isClosed(): Boolean
+	abstract val isClosed: Boolean
 
-	abstract fun isDataAvailable(): Boolean
+	abstract val isDataAvailable: Boolean
 
-	abstract fun isConnected(): Boolean
+	abstract val isConnected: Boolean
 
 	abstract override fun close()
 
@@ -120,7 +108,7 @@ abstract class DataTransferClient: Closeable {
 			md = MessageDigest.getInstance("SHA-512/256") // Better performance than SHA-256
 			setHandle(((-1).toByte())) { _: Byte, _: ByteArray ->
 				try {
-					if (!isClosed()) {
+					if (!isClosed) {
 						logger.fine("close recv $this")
 						close()
 					}
@@ -129,14 +117,14 @@ abstract class DataTransferClient: Closeable {
 				}
 			}
 			setHandle((-127).toByte()) { _: Byte, data: ByteArray ->
-				if (!isClosed()) {
+				if (!isClosed) {
 					if (String(data, Charsets.UTF_8) == "Ping")
 						sendData((-127).toByte(), "Pong".toByteArray(Charsets.UTF_8))
 					else pingReceived()
 				}
 			}
 			setHandle((-126).toByte()) { _: Byte, data: ByteArray ->
-				if (!isClosed()) {
+				if (!isClosed) {
 					if (String(data, Charsets.UTF_8) == "Ping")
 						sendRawData((-126).toByte(), "Pong".toByteArray(Charsets.UTF_8))
 					else pingReceived()
@@ -146,20 +134,20 @@ abstract class DataTransferClient: Closeable {
 			logger.log(Level.WARNING, dataTransferClient, e)
 		}
 		Updater.add(ThrowingRunnable {
-			if (!isClosed() && isDataAvailable()) try {
+			if (!isClosed && isDataAvailable) try {
 				val data = receiveData()
 				Files.write(File("./${appendix}_${System.currentTimeMillis()}_${data.type}.pckt").toPath(), data.data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
 				if (handles.containsKey(data.type)) getHandle(data.type)!!(data.type, data.data) else receiveQueue.add(data)
 			} catch (e: IOException) {
 				logger.log(Level.WARNING, dataTransferClient, e)
 			}
-			if (delayedSend.isNotEmpty() && initialized && !isClosed()) {
+			if (delayedSend.isNotEmpty() && initialized && !isClosed) {
 				val (type, data) = delayedSend.removeAt(0)
 				sendData(type, data)
 			}
 		}, "CheckForMsgs $appendix")
 		Updater.add(ThrowingRunnable {
-			if (!isClosed() && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
+			if (!isClosed && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
 				try {
 					sendClose()
 				} catch (e: SocketException) {
@@ -239,9 +227,9 @@ abstract class DataTransferClient: Closeable {
 
 	@Throws(SocketException::class)
 	fun ping() {
-		if (isClosed() || !isConnected() || !initialized) return
+		if (isClosed || !isConnected || !initialized) return
 		synchronized(pingLock) {
-			if (isClosed() || !isConnected() || !initialized) return
+			if (isClosed || !isConnected || !initialized) return
 			pingStartTime = System.currentTimeMillis()
 			try {
 				sendData((-127).toByte(), "Ping".toByteArray(Charsets.UTF_8))
@@ -254,9 +242,9 @@ abstract class DataTransferClient: Closeable {
 
 	@Throws(SocketException::class)
 	fun rawPing() {
-		if (isClosed() || !isConnected() || !initialized) return
+		if (isClosed || !isConnected || !initialized) return
 		synchronized(pingLock)  {
-			if (isClosed() || !isConnected() || !initialized) return
+			if (isClosed || !isConnected || !initialized) return
 			pingStartTime = System.currentTimeMillis()
 			try {
 				sendRawData((-126).toByte(), "Ping".toByteArray(Charsets.UTF_8))
@@ -269,7 +257,7 @@ abstract class DataTransferClient: Closeable {
 
 	fun setupPeriodicRawPing(millis: Long = 100) {
 		Updater.add(Runnable {
-			if (!isClosed()) {
+			if (!isClosed) {
 				if (pingStartTime == 0L) {
 					rawPing() // Potential deadlock
 				}
@@ -282,7 +270,7 @@ abstract class DataTransferClient: Closeable {
 
 	fun setupPeriodicPing(millis: Long = 100) {
 		Updater.add(Runnable {
-			if (!isClosed()) {
+			if (!isClosed) {
 				if (pingStartTime == 0L) {
 					ping() // Potential deadlock
 				}
@@ -301,7 +289,7 @@ abstract class DataTransferClient: Closeable {
 	@Throws(SocketException::class)
 	fun sendClose() {
 		logger.log(Level.WARNING, "send close $appendix $this", Exception("send close"))
-		if (!isClosed() && isConnected()) sendRawData((-1).toByte(), ByteArray(0))
+		if (!isClosed && isConnected) sendRawData((-1).toByte(), ByteArray(0))
 	}
 
 	private fun equalsOrNull(other: Class<*>?, clazz: Class<*>): Boolean {

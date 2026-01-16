@@ -94,17 +94,14 @@ open class Socket(protected val socket: NetSocket = NetSocket()) : DataTransferC
 		super.initWithHost(host)
 	}
 
-	override fun isClosed(): Boolean {
-		return socket.isClosed
-	}
+	override val isClosed: Boolean
+    	get() = socket.isClosed
 
-	override fun isDataAvailable(): Boolean {
-		return socket.inputStream.available() > 0
-	}
+	override val isDataAvailable: Boolean
+		get() = socket.inputStream.available() > 0
 
-	override fun isConnected(): Boolean {
-		return socket.isConnected
-	}
+	override val isConnected: Boolean
+		get() = socket.isConnected
 
 	override fun name(withClassName: Boolean) = if (withClassName) "${javaClass.simpleName} ${socket.inetAddress}:${socket.port}" else "${socket.inetAddress}:${socket.port}"
 
@@ -177,13 +174,13 @@ open class Socket(protected val socket: NetSocket = NetSocket()) : DataTransferC
 			delayedSend.add(Packet(type, data))
 			return
 		}
-		if (isClosed()) throw SocketException(socketClosed)
+		if (isClosed) throw SocketException(socketClosed)
 		val md = md ?: throw IllegalStateException()
 		var sendStamp = 0L
 		try {
 			sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
 
-			if (isClosed()) throw SocketException(socketClosed)
+			if (isClosed) throw SocketException(socketClosed)
 			Files.write(File("./${appendix}_${System.currentTimeMillis()}_${type}${if (raw) "I" else ""}S.pckt").toPath(), data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
 			val modifiedData = if (raw) data else implSendData(type, data)
 			val hash = md.digest(modifiedData)
@@ -236,7 +233,7 @@ open class Socket(protected val socket: NetSocket = NetSocket()) : DataTransferC
 				sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
 
 				try {
-					if (!isClosed()) {
+					if (!isClosed) {
 						shutdownHook(this)
 						socket.shutdownOutput()
 						socket.shutdownInput()
