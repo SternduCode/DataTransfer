@@ -3,7 +3,6 @@ package com.sterndu.data.transfer
 
 import com.sterndu.data.transfer.basic.Socket
 import java.net.SocketException
-import java.util.*
 
 
 class Connector(
@@ -17,14 +16,13 @@ class Connector(
 			if (handle != null) for (dpt in packets) handle(dpt.type, dpt.data)
 		}
 
-	private val packets: MutableList<Packet>
+	private val packets: MutableList<Packet> = ArrayList()
 
-	var handleDisabled = false
+    var handleDisabled = false
 		private set
 
 	init {
-		packets = ArrayList()
-		enableHandle()
+        enableHandle()
 	}
 
 	/**
