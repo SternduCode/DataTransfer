@@ -1,5 +1,5 @@
 plugins {
-	kotlin("jvm")
+	alias(libs.plugins.kotlinJvm)
 }
 
 sourceSets.main {
