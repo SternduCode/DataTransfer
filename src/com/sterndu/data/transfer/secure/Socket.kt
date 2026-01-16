@@ -18,6 +18,7 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.concurrent.atomic.AtomicLong
 import java.util.logging.Level
 import java.util.logging.Logger
+import java.net.Socket as NetSocket
 
 open class Socket : Socket {
 
@@ -28,6 +29,8 @@ open class Socket : Socket {
 	protected var crypter: Crypter? = null
 
 	constructor()
+
+	constructor(socket: NetSocket) : super(socket)
 
 	@Throws(IOException::class)
 	constructor(address: InetAddress, port: Int) : super(address, port)
@@ -59,6 +62,7 @@ open class Socket : Socket {
 	 * @return the byte[]
 	 */
 	override fun implReceiveData(type: Byte, data: ByteArray): ByteArray {
+		if (!initialized) throw IllegalStateException("Socket not initialized!")
 		return when (type) {
 			0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte(), (-126).toByte() -> data
 			else -> crypter!!.decrypt(data)
@@ -73,6 +77,7 @@ open class Socket : Socket {
 	 * @return the byte[]
 	 */
 	override fun implSendData(type: Byte, data: ByteArray): ByteArray {
+		if (!initialized) throw IllegalStateException("Socket not initialized!")
 		return when (type) {
 			0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte(), (-126).toByte() -> data
 			else -> crypter!!.encrypt(data)
@@ -97,7 +102,7 @@ open class Socket : Socket {
 			Updater.add(Runnable {
 				if (System.currentTimeMillis() - lastInitStageTime.get() > 15000) try {
 					close()
-					logger.log(Level.FINE, "$inetAddress tried to connect! But failed to initialize initCheck $appendix")
+					logger.log(Level.FINE, "${socket.inetAddress} tried to connect! But failed to initialize initCheck $appendix")
 					removeUpdater("InitCheck $appendix")
 					Updater.printAll(logger)
 				} catch (e: IOException) {
@@ -126,7 +131,7 @@ open class Socket : Socket {
 		bb.putInt(pubKeyEnc.size)
 		bb.put(pubKeyEnc)
 		bb.asShortBuffer().put(CrypterProvider.availableCrypterCodes)
-		sendInternalData((-2).toByte(), bb.array())
+		sendRawData((-2).toByte(), bb.array())
 	}
 
 	private fun initPhase1(data: ByteArray, lastInitStageTime: AtomicLong) {
@@ -156,7 +161,7 @@ open class Socket : Socket {
 			bb = ByteBuffer.allocate(2 + pubKeyEnc.size)
 			bb.putShort(li.last())
 			bb.put(pubKeyEnc)
-			sendInternalData((-3).toByte(), bb.array())
+			sendRawData((-3).toByte(), bb.array())
 			crypter = CrypterProvider.getCrypterByCode(li.last())!!
 			crypter!!.makeKey(dH.getSecret()!!)
 			initialized = true
