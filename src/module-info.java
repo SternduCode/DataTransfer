@@ -8,4 +8,6 @@ module com.sterndu.DataTransfer {
 	requires transitive com.sterndu.MultiCore;
 	requires kotlin.stdlib;
 	requires java.logging;
+
+	requires kotlinx.coroutines.core;
 }

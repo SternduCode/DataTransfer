@@ -1,5 +1,6 @@
 plugins {
 	kotlin("jvm")
+	alias(libs.plugins.ktor)
 }
 
 sourceSets.main {
@@ -24,6 +25,12 @@ dependencies {
 	implementation(project(":Util"))
 	implementation(project(":Multicore"))
 	implementation(project(":Encryption"))
+	implementation(libs.ktor.serverCore)
+	implementation(libs.ktor.serverNetty)
+	implementation(libs.ktor.network)
+	implementation(libs.ktor.network.tls)
+	implementation(libs.ktor.client.core)
+	implementation(libs.kotlinx.coroutinesSwing)
 }
 
 tasks.withType<Jar> {
