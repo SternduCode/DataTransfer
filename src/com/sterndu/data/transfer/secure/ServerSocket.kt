@@ -1,33 +1,28 @@
 @file:JvmName("ServerSocket")
 package com.sterndu.data.transfer.secure
 
-import com.sterndu.data.transfer.basic.ServerSocket
+import com.sterndu.data.transfer.DataTransferClient
 import java.io.IOException
 import java.net.InetAddress
+import java.net.ServerSocket
 
-class ServerSocket : ServerSocket {
+class ServerSocket(val serverSocket: ServerSocket = ServerSocket()) {
 	@Throws(IOException::class)
-	constructor()
+	constructor(port: Int) : this(ServerSocket(port))
 	@Throws(IOException::class)
-	constructor(port: Int) : super(port)
+	constructor(port: Int, backlog: Int) : this(ServerSocket(port, backlog))
 	@Throws(IOException::class)
-	constructor(port: Int, backlog: Int) : super(port, backlog)
-	@Throws(IOException::class)
-	constructor(port: Int, backlog: Int, bindAddr: InetAddress?) : super(port, backlog, bindAddr)
+	constructor(port: Int, backlog: Int, bindAddr: InetAddress?) : this(ServerSocket(port, backlog, bindAddr))
 
 	@Throws(IOException::class)
-	override fun accept(): Socket {
-		val s = Socket()
-		try {
-			super.implAccept(s)
+	fun accept(): DataTransferClient {
+		val s = try {
+			serverSocket.accept()
 		} catch (e: IOException) {
-			if (s.isBound && !s.isClosed) {
-				s.close()
-			}
-			com.sterndu.data.transfer.basic.Socket.allSockets.remove(s)
 			throw e
 		}
-		s.internalInit(true)
-		return s
+		return Socket(s).apply {
+			initWithHost(true)
+		}
 	}
 }
