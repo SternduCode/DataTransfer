@@ -20,7 +20,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 import java.net.Socket as NetSocket
 
-open class Socket(protected val socket: NetSocket = NetSocket()) : DataTransferClient() {
+open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 
 	private var logger: Logger = LoggingUtil.getLogger(basicSocket)
 
