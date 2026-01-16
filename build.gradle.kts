@@ -1,6 +1,5 @@
 plugins {
 	kotlin("jvm")
-	alias(libs.plugins.ktor)
 }
 
 sourceSets.main {
