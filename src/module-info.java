@@ -4,8 +4,8 @@ module com.sterndu.DataTransfer {
 	exports com.sterndu.data.transfer.secure;
 
 	requires transitive com.sterndu.Encryption;
-	requires transitive com.sterndu.Util; 
 	requires transitive com.sterndu.MultiCore;
+	requires com.sterndu.Util;
 	requires kotlin.stdlib;
 	requires java.logging;
 

@@ -3,7 +3,6 @@ package com.sterndu.data.transfer
 
 import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
-import com.sterndu.util.interfaces.ThrowingRunnable
 import io.ktor.utils.io.core.Closeable
 import java.io.File
 import java.io.IOException
@@ -133,7 +132,7 @@ abstract class DataTransferClient: Closeable {
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, dataTransferClient, e)
 		}
-		Updater.add(ThrowingRunnable {
+		Updater.add({
 			if (!isClosed && isDataAvailable) try {
 				val data = receiveData()
 				Files.write(File("./${appendix}_${System.currentTimeMillis()}_${data.type}.pckt").toPath(), data.data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
@@ -146,7 +145,7 @@ abstract class DataTransferClient: Closeable {
 				sendData(type, data)
 			}
 		}, "CheckForMsgs $appendix")
-		Updater.add(ThrowingRunnable {
+		Updater.add({
 			if (!isClosed && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
 				try {
 					sendClose()
