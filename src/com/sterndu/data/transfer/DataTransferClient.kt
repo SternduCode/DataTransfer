@@ -105,33 +105,41 @@ abstract class DataTransferClient: Closeable {
 		try {
 			isHost = host
 			md = MessageDigest.getInstance("SHA-512/256") // Better performance than SHA-256
-			setHandle(((-1).toByte())) { _: Byte, _: ByteArray ->
-				try {
-					if (!isClosed) {
-						logger.fine("close recv $this")
-						close()
-					}
-				} catch (e: IOException) {
-					logger.log(Level.WARNING, dataTransferClient, e)
-				}
-			}
-			setHandle((-127).toByte()) { _: Byte, data: ByteArray ->
-				if (!isClosed) {
-					if (String(data, Charsets.UTF_8) == "Ping")
-						sendData((-127).toByte(), "Pong".toByteArray(Charsets.UTF_8))
-					else pingReceived()
-				}
-			}
-			setHandle((-126).toByte()) { _: Byte, data: ByteArray ->
-				if (!isClosed) {
-					if (String(data, Charsets.UTF_8) == "Ping")
-						sendRawData((-126).toByte(), "Pong".toByteArray(Charsets.UTF_8))
-					else pingReceived()
-				}
-			}
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, dataTransferClient, e)
 		}
+		setDefaultHandles()
+		setDefaultUpdaterTasks()
+	}
+
+	fun setDefaultHandles() {
+		setHandle((-1).toByte()) { _: Byte, _: ByteArray ->
+			try {
+				if (!isClosed) {
+					logger.fine("close recv $this")
+					close()
+				}
+			} catch (e: IOException) {
+				logger.log(Level.WARNING, dataTransferClient, e)
+			}
+		}
+		setHandle((-127).toByte()) { _: Byte, data: ByteArray ->
+			if (!isClosed) {
+				if (String(data, Charsets.UTF_8) == "Ping")
+					sendData((-127).toByte(), "Pong".toByteArray(Charsets.UTF_8))
+				else pingReceived()
+			}
+		}
+		setHandle((-126).toByte()) { _: Byte, data: ByteArray ->
+			if (!isClosed) {
+				if (String(data, Charsets.UTF_8) == "Ping")
+					sendRawData((-126).toByte(), "Pong".toByteArray(Charsets.UTF_8))
+				else pingReceived()
+			}
+		}
+	}
+
+	fun setDefaultUpdaterTasks() {
 		Updater.add({
 			if (!isClosed && isDataAvailable) try {
 				val data = receiveData()
@@ -268,7 +276,7 @@ abstract class DataTransferClient: Closeable {
 	}
 
 	fun setupPeriodicPing(millis: Long = 100) {
-		Updater.add(Runnable {
+		Updater.add({
 			if (!isClosed) {
 				if (pingStartTime == 0L) {
 					ping() // Potential deadlock
