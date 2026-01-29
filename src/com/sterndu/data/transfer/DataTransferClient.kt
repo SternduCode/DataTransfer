@@ -100,8 +100,10 @@ abstract class DataTransferClient: Closeable {
 	}
 
 	protected open fun init(host: Boolean){
-		if (logger == null)
+		if (logger == null) {
 			logger = LoggingUtil.getLogger(dataTransferClient)
+			logger.info("FFS needed late init logger")
+		}
 		try {
 			isHost = host
 			md = MessageDigest.getInstance("SHA-512/256") // Better performance than SHA-256
@@ -110,6 +112,7 @@ abstract class DataTransferClient: Closeable {
 		}
 		setDefaultHandles()
 		setDefaultUpdaterTasks()
+
 	}
 
 	fun setDefaultHandles() {
@@ -216,16 +219,6 @@ abstract class DataTransferClient: Closeable {
 	 */
 	fun hasMessage(): Boolean {
 		return receiveQueue.isNotEmpty()
-	}
-
-	/**
-	 * Request resend.
-	 *
-	 * @throws SocketException the socket exception
-	 */
-	@Throws(SocketException::class)
-	fun requestResend() {//TODO not implemented
-		sendRawData(0.toByte(), ByteArray(0))
 	}
 
 	fun getAveragePingTime() = lastPings.average()

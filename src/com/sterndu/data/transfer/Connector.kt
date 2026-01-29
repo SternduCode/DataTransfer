@@ -59,11 +59,6 @@ class Connector(
 		get() = if (availablePackets() > 0) packets.removeAt(0) else null
 
 	@Throws(SocketException::class)
-	fun requestResend() {
-		sock.requestResend()
-	}
-
-	@Throws(SocketException::class)
 	fun sendData(type: Byte, data: ByteArray) {
 		val send = ByteArray(data.size + 1)
 		send[0] = type
