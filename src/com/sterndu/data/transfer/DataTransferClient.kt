@@ -45,10 +45,6 @@ abstract class DataTransferClient: Closeable {
 
 	protected abstract var appendix: String
 
-	private var packetCounterSend: Short = 0
-	private var packetCounterReceive: Short = 0
-	private val resendList = HashMap<Short, Packet>()
-
 	open var isHost = false
 		protected set
 
@@ -147,7 +143,9 @@ abstract class DataTransferClient: Closeable {
 			if (!isClosed && isDataAvailable) try {
 				val data = receiveData()
 				Files.write(File("./${appendix}_${System.currentTimeMillis()}_${data.type}.pckt").toPath(), data.data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
-				if (handles.containsKey(data.type)) getHandle(data.type)!!(data.type, data.data) else receiveQueue.add(data)
+				getHandle(data.type)?.also {
+					it(data.type, data.data)
+				} ?: receiveQueue.add(data)
 			} catch (e: IOException) {
 				logger.log(Level.WARNING, dataTransferClient, e)
 			}
@@ -160,7 +158,7 @@ abstract class DataTransferClient: Closeable {
 			if (!isClosed && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
 				try {
 					sendClose()
-				} catch (e: SocketException) {
+				} catch (_: SocketException) {
 					logger.finer(ALREADY_CLOSED)
 					disablePeriodicPing()
 				}
@@ -217,13 +215,11 @@ abstract class DataTransferClient: Closeable {
 	 *
 	 * @return true, if successful
 	 */
-	fun hasMessage(): Boolean {
-		return receiveQueue.isNotEmpty()
-	}
+	val hasMessage: Boolean get() = receiveQueue.isNotEmpty()
 
 	fun getAveragePingTime() = lastPings.average()
 
-	fun getLastPingTime() = lastPings.lastOrNull() ?: -1L
+	val lastPingTime: Long get() = lastPings.lastOrNull() ?: -1L
 
 	@Throws(SocketException::class)
 	fun ping() {
@@ -233,7 +229,7 @@ abstract class DataTransferClient: Closeable {
 			pingStartTime = System.currentTimeMillis()
 			try {
 				sendData((-127).toByte(), "Ping".toByteArray(Charsets.UTF_8))
-			} catch (e: Exception) {
+			} catch (_: Exception) {
 				logger.finer(ALREADY_CLOSED)
 				Updater.remove("Ping $appendix")
 			}
@@ -248,7 +244,7 @@ abstract class DataTransferClient: Closeable {
 			pingStartTime = System.currentTimeMillis()
 			try {
 				sendRawData((-126).toByte(), "Ping".toByteArray(Charsets.UTF_8))
-			} catch (e: Exception) {
+			} catch (_: Exception) {
 				logger.finer(ALREADY_CLOSED)
 				Updater.remove("Ping $appendix")
 			}
@@ -256,7 +252,7 @@ abstract class DataTransferClient: Closeable {
 	}
 
 	fun setupPeriodicRawPing(millis: Long = 100) {
-		Updater.add(Runnable {
+		Updater.add({
 			if (!isClosed) {
 				if (pingStartTime == 0L) {
 					rawPing() // Potential deadlock
@@ -310,12 +306,11 @@ abstract class DataTransferClient: Closeable {
 				if (equalsOrNull(handles[type]?.first, caller)) {
 					if (handle != null) {
 						if (!handles.containsKey(type)) {
-							val it = receiveQueue.iterator()
-							it.forEach { (type1, data) ->
+							receiveQueue.removeIf { (type1, data) ->
 								if (type1 == type) {
 									handle(type1, data)
-									it.remove()
-								}
+									true
+								} else false
 							}
 						}
 						handles[type] = caller to handle
