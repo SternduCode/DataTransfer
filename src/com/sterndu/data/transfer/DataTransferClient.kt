@@ -139,7 +139,7 @@ abstract class DataTransferClient: Closeable {
 	}
 
 	fun setDefaultUpdaterTasks() {
-		Updater.add({
+		Updater.add("CheckForMsgs $appendix") {
 			if (!isClosed && isDataAvailable) try {
 				val data = receiveData()
 				Files.write(File("./${appendix}_${System.currentTimeMillis()}_${data.type}.pckt").toPath(), data.data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
@@ -153,8 +153,8 @@ abstract class DataTransferClient: Closeable {
 				val (type, data) = delayedSend.removeAt(0)
 				sendData(type, data)
 			}
-		}, "CheckForMsgs $appendix")
-		Updater.add({
+		}
+		Updater.add("PingKill $appendix") {
 			if (!isClosed && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
 				try {
 					sendClose()
@@ -164,7 +164,7 @@ abstract class DataTransferClient: Closeable {
 				}
 				close()
 			}
-		}, "PingKill $appendix")
+		}
 	}
 
 	abstract fun name(withClassName: Boolean = false): String
@@ -252,7 +252,7 @@ abstract class DataTransferClient: Closeable {
 	}
 
 	fun setupPeriodicRawPing(millis: Long = 100) {
-		Updater.add({
+		Updater.add("Ping $appendix", millis) {
 			if (!isClosed) {
 				if (pingStartTime == 0L) {
 					rawPing() // Potential deadlock
@@ -260,12 +260,12 @@ abstract class DataTransferClient: Closeable {
 			} else {
 				disablePeriodicPing()
 			}
-		}, "Ping $appendix", millis)
+		}
 		rawPing() // Potential deadlock
 	}
 
 	fun setupPeriodicPing(millis: Long = 100) {
-		Updater.add({
+		Updater.add("Ping $appendix", millis) {
 			if (!isClosed) {
 				if (pingStartTime == 0L) {
 					ping() // Potential deadlock
@@ -273,7 +273,7 @@ abstract class DataTransferClient: Closeable {
 			} else {
 				disablePeriodicPing()
 			}
-		}, "Ping $appendix", millis)
+		}
 		ping() // Potential deadlock
 	}
 

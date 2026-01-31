@@ -99,17 +99,17 @@ open class Socket : Socket {
 			initialized = false
 			dH = DiffieHellman()
 			val lastInitStageTime = AtomicLong(System.currentTimeMillis())
-			Updater.add(Runnable {
-				if (System.currentTimeMillis() - lastInitStageTime.get() > 15000) try {
-					close()
-					logger.log(Level.FINE, "${socket.inetAddress} tried to connect! But failed to initialize initCheck $appendix")
-					removeUpdater("InitCheck $appendix")
-					Updater.printAll(logger)
-				} catch (e: IOException) {
-					logger.log(Level.WARNING, SECURE_SOCKET, e)
-				}
-			}, "InitCheck $appendix")
-			setHandle((-2).toByte()) { _: Byte, data: ByteArray ->
+			Updater.add("InitCheck $appendix") {
+                if (System.currentTimeMillis() - lastInitStageTime.get() > 15000) try {
+                    close()
+                    logger.log(Level.FINE, "${socket.inetAddress} tried to connect! But failed to initialize initCheck $appendix")
+                    removeUpdater("InitCheck $appendix")
+                    Updater.printAll(logger)
+                } catch (e: IOException) {
+                    logger.log(Level.WARNING, SECURE_SOCKET, e)
+                }
+            }
+            setHandle((-2).toByte()) { _: Byte, data: ByteArray ->
 				initPhase1(data, lastInitStageTime)
 			} // Test reduced number of calls && add hashing list avail stuff && add option to disable double hashing
 			setHandle((-3).toByte()) { _: Byte, data: ByteArray ->
