@@ -111,7 +111,7 @@ abstract class DataTransferClient: Closeable {
 
 	}
 
-	fun setDefaultHandles() {
+	private fun setDefaultHandles() {
 		setHandle((-1).toByte()) { _: Byte, _: ByteArray ->
 			try {
 				if (!isClosed) {
@@ -138,7 +138,7 @@ abstract class DataTransferClient: Closeable {
 		}
 	}
 
-	fun setDefaultUpdaterTasks() {
+	private fun setDefaultUpdaterTasks() {
 		Updater.add("CheckForMsgs $appendix") {
 			if (!isClosed && isDataAvailable) try {
 				val data = receiveData()
