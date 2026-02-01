@@ -42,6 +42,7 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port))", "import java.net.Socket as NetSocket"))
 	constructor(address: InetAddress, port: Int) : this(NetSocket(address, port))
 
 	/**
@@ -54,6 +55,7 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
 	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int) : this(NetSocket(
 		address,
 		port,
@@ -70,6 +72,7 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class, UnknownHostException::class)
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port))", "import java.net.Socket as NetSocket"))
 	constructor(host: String, port: Int) : this(NetSocket(host, port))
 
 	/**
@@ -82,6 +85,7 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
 	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int) : this(NetSocket(
 		host,
 		port,
@@ -249,7 +253,7 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 				recvLock.unlock(recvStamp)
 				sendLock.unlock(sendStamp)
 			}
-		} catch (e: NullPointerException) {
+		} catch (_: NullPointerException) {
             Updater.remove("CheckForMsgs $appendix")
             Updater.remove("PingKill $appendix")
             disablePeriodicPing()

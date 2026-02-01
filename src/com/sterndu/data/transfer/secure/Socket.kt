@@ -33,9 +33,11 @@ open class Socket : Socket {
 	constructor(socket: NetSocket) : super(socket)
 
 	@Throws(IOException::class)
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port))", "import java.net.Socket as NetSocket"))
 	constructor(address: InetAddress, port: Int) : super(address, port)
 
 	@Throws(IOException::class)
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
 	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int) : super(
 		address,
 		port,
@@ -44,9 +46,11 @@ open class Socket : Socket {
 	)
 
 	@Throws(IOException::class, UnknownHostException::class)
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port))", "import java.net.Socket as NetSocket"))
 	constructor(host: String, port: Int) : super(host, port)
 
 	@Throws(IOException::class)
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
 	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int) : super(
 		host,
 		port,
