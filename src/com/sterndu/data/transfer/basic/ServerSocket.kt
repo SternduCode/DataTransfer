@@ -2,16 +2,9 @@
 package com.sterndu.data.transfer.basic
 
 import java.io.IOException
-import java.net.InetAddress
 import java.net.ServerSocket
 
 open class ServerSocket(val serverSocket: ServerSocket = ServerSocket()) {
-	@Throws(IOException::class)
-	constructor(port: Int) : this(ServerSocket(port))
-	@Throws(IOException::class)
-	constructor(port: Int, backlog: Int) : this(ServerSocket(port, backlog))
-	@Throws(IOException::class)
-	constructor(port: Int, backlog: Int, bindAddr: InetAddress?) : this(ServerSocket(port, backlog, bindAddr))
 
 	@Throws(IOException::class)
 	fun accept(): Socket {
