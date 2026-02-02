@@ -16,7 +16,7 @@ import java.util.*
 import java.util.logging.Level
 import java.util.logging.Logger
 
-open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: Boolean = false) : DataTransferClient(secureMode) {
+open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: Boolean = false, host: Boolean = false) : DataTransferClient(secureMode) {
 
 	private var logger: Logger = LoggingUtil.getLogger(basicSocket)
 
@@ -26,7 +26,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
 		allSockets[this] = Thread.currentThread().stackTrace.let { it.copyOfRange(1, 4.coerceAtMost(it.size)) }
 		if (socket.isBound) {
 			appendix = "${socket.inetAddress}:${socket.port} -- ${socket.localAddress}:${socket.localPort}".replace("/", "").replace(":", "-")
-			init(false)
+			init(host)
 		}
 	}
 
@@ -38,7 +38,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
 	 * @throws java.io.IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
-	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port))", "import java.net.Socket as NetSocket"))
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port))", "java.net.Socket as NetSocket"))
 	constructor(address: InetAddress, port: Int, secureMode: Boolean = false) : this(java.net.Socket(address, port), secureMode)
 
 	/**
@@ -51,7 +51,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
-	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port, localAddr, localPort))", "java.net.Socket as NetSocket"))
 	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(
         java.net.Socket(
             address,
@@ -69,7 +69,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class, UnknownHostException::class)
-	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port))", "import java.net.Socket as NetSocket"))
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port))", "java.net.Socket as NetSocket"))
 	constructor(host: String, port: Int, secureMode: Boolean = false) : this(java.net.Socket(host, port), secureMode)
 
 	/**
@@ -82,7 +82,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
-	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
+	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port, localAddr, localPort))", "java.net.Socket as NetSocket"))
 	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(
         java.net.Socket(
             host,
@@ -91,6 +91,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
             localPort
         ), secureMode)
 
+	@Deprecated("Use constructor parameter instead")
 	fun initWithHost(host: Boolean) {
 		appendix = "${socket.inetAddress}:${socket.port} -- ${socket.localAddress}:${socket.localPort}".replace("/", "").replace(":", "-")
 		super.init(host)

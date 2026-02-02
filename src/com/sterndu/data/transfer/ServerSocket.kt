@@ -12,8 +12,6 @@ open class ServerSocket(val serverSocket: ServerSocket = ServerSocket(), val sec
 		} catch (e: IOException) {
             throw e
 		}
-		return Socket(s, secureMode).apply {
-			initWithHost(true)
-		}
+		return Socket(s, secureMode, true)
 	}
 }
