@@ -74,11 +74,13 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	protected open fun implReceiveData(type: Byte, data: ByteArray): ByteArray {
 		return if (!secureMode) data
 		else {
-			val crypter = crypter
-            check(initialized && crypter != null) { "Socket not initialized!" }
 			when (type) {
 				0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte(), (-126).toByte() -> data
-				else -> crypter.decrypt(data)
+				else -> {
+					val crypter = crypter
+					check(initialized && crypter != null) { "Socket not initialized!" }
+					crypter.decrypt(data)
+				}
 			}
 		}
 	}
@@ -117,7 +119,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 	abstract override fun close()
 
-	protected open fun init(host: Boolean){
+	protected open fun init(host: Boolean) {
 		if (logger == null) {
 			logger = LoggingUtil.getLogger(dataTransferClient)
 			logger.info("FFS needed late init logger")
