@@ -13,7 +13,7 @@ open class ServerSocket(val serverSocket: ServerSocket = ServerSocket()) {
 		} catch (e: IOException) {
             throw e
 		}
-		return Socket(s).apply {
+		return Socket(s, false).apply {
 			initWithHost(true)
 		}
 	}
