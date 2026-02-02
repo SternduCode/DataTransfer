@@ -1,7 +1,6 @@
 package com.sterndu.data.transfer
 
 import com.sterndu.multicore.LoggingUtil
-import com.sterndu.multicore.Updater
 import com.sterndu.util.readXBytes
 import java.io.File
 import java.io.IOException
@@ -240,8 +239,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
 						shutdownHook(this)
 						socket.shutdownOutput()
 						socket.shutdownInput()
-						Updater.remove("CheckForMsgs $appendix")
-						Updater.remove("PingKill $appendix")
+						removeDefaultUpdaterTasks()
 						disablePeriodicPing()
 						socket.close()
 					}
@@ -253,8 +251,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
 				sendLock.unlock(sendStamp)
 			}
 		} catch (_: NullPointerException) {
-            Updater.remove("CheckForMsgs $appendix")
-            Updater.remove("PingKill $appendix")
+            removeDefaultUpdaterTasks()
             disablePeriodicPing()
 			socket.close()
 		}

@@ -224,6 +224,11 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		}
 	}
 
+	protected fun removeDefaultUpdaterTasks() {
+		Updater.remove("CheckForMsgs $appendix")
+		Updater.remove("PingKill $appendix")
+	}
+
 	@Throws(SocketException::class)
 	fun startHandshake() {
 		initialized = false
