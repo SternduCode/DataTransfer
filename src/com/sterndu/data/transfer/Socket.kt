@@ -1,8 +1,5 @@
-@file:JvmName("Socket")
-package com.sterndu.data.transfer.basic
+package com.sterndu.data.transfer
 
-import com.sterndu.data.transfer.DataTransferClient
-import com.sterndu.data.transfer.Packet
 import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import com.sterndu.util.readXBytes
@@ -18,9 +15,8 @@ import java.nio.file.StandardOpenOption
 import java.util.*
 import java.util.logging.Level
 import java.util.logging.Logger
-import java.net.Socket as NetSocket
 
-open class Socket(val socket: NetSocket = NetSocket(), secureMode: Boolean = false) : DataTransferClient(secureMode) {
+open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: Boolean = false) : DataTransferClient(secureMode) {
 
 	private var logger: Logger = LoggingUtil.getLogger(basicSocket)
 
@@ -39,11 +35,11 @@ open class Socket(val socket: NetSocket = NetSocket(), secureMode: Boolean = fal
 	 *
 	 * @param address the address
 	 * @param port the port
-	 * @throws IOException Signals that an I/O exception has occurred.
+	 * @throws java.io.IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class)
 	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port))", "import java.net.Socket as NetSocket"))
-	constructor(address: InetAddress, port: Int, secureMode: Boolean = false) : this(NetSocket(address, port), secureMode)
+	constructor(address: InetAddress, port: Int, secureMode: Boolean = false) : this(java.net.Socket(address, port), secureMode)
 
 	/**
 	 * Instantiates a new socket.
@@ -56,24 +52,25 @@ open class Socket(val socket: NetSocket = NetSocket(), secureMode: Boolean = fal
 	 */
 	@Throws(IOException::class)
 	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
-	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(NetSocket(
-		address,
-		port,
-		localAddr,
-		localPort
-	), secureMode)
+	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(
+        java.net.Socket(
+            address,
+            port,
+            localAddr,
+            localPort
+        ), secureMode)
 
 	/**
 	 * Instantiates a new socket.
 	 *
 	 * @param host the host
 	 * @param port the port
-	 * @throws UnknownHostException the unknown host exception
+	 * @throws java.net.UnknownHostException the unknown host exception
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	@Throws(IOException::class, UnknownHostException::class)
 	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port))", "import java.net.Socket as NetSocket"))
-	constructor(host: String, port: Int, secureMode: Boolean = false) : this(NetSocket(host, port), secureMode)
+	constructor(host: String, port: Int, secureMode: Boolean = false) : this(java.net.Socket(host, port), secureMode)
 
 	/**
 	 * Instantiates a new socket.
@@ -86,12 +83,13 @@ open class Socket(val socket: NetSocket = NetSocket(), secureMode: Boolean = fal
 	 */
 	@Throws(IOException::class)
 	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
-	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(NetSocket(
-		host,
-		port,
-		localAddr,
-		localPort
-	), secureMode)
+	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(
+        java.net.Socket(
+            host,
+            port,
+            localAddr,
+            localPort
+        ), secureMode)
 
 	fun initWithHost(host: Boolean) {
 		appendix = "${socket.inetAddress}:${socket.port} -- ${socket.localAddress}:${socket.localPort}".replace("/", "").replace(":", "-")
@@ -170,7 +168,7 @@ open class Socket(val socket: NetSocket = NetSocket(), secureMode: Boolean = fal
 	 * @param type the type
 	 * @param data the data
 	 * @param raw true, if raw data should be sent
-	 * @throws SocketException the socket exception
+	 * @throws java.net.SocketException the socket exception
 	 */
 	@Throws(SocketException::class)
 	override fun sendData(type: Byte, data: ByteArray, raw: Boolean) {

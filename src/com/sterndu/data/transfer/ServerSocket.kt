@@ -1,10 +1,9 @@
-@file:JvmName("ServerSocket")
-package com.sterndu.data.transfer.basic
+package com.sterndu.data.transfer
 
 import java.io.IOException
 import java.net.ServerSocket
 
-open class ServerSocket(val serverSocket: ServerSocket = ServerSocket()) {
+open class ServerSocket(val serverSocket: ServerSocket = ServerSocket(), val secureMode: Boolean = false) {
 
 	@Throws(IOException::class)
 	fun accept(): Socket {
@@ -13,7 +12,7 @@ open class ServerSocket(val serverSocket: ServerSocket = ServerSocket()) {
 		} catch (e: IOException) {
             throw e
 		}
-		return Socket(s, false).apply {
+		return Socket(s, secureMode).apply {
 			initWithHost(true)
 		}
 	}

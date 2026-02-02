@@ -1,13 +1,13 @@
 @file:JvmName("Socket")
 package com.sterndu.data.transfer.secure
 
-import com.sterndu.data.transfer.basic.Socket
+import com.sterndu.data.transfer.Socket
 import java.io.IOException
 import java.net.InetAddress
 import java.net.UnknownHostException
 import java.net.Socket as NetSocket
 
-@Deprecated("Use com.sterndu.data.transfer.basic.Socket instead with secureMode = true", ReplaceWith("Socket", "import com.sterndu.data.transfer.basic.Socket"))
+@Deprecated("Use com.sterndu.data.transfer.Socket instead with secureMode = true", ReplaceWith("Socket", "import com.sterndu.data.transfer.Socket"))
 open class Socket : Socket {
 
 	constructor()

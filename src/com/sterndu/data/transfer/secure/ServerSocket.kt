@@ -1,7 +1,7 @@
 @file:JvmName("ServerSocket")
 package com.sterndu.data.transfer.secure
 
-import com.sterndu.data.transfer.basic.Socket
+import com.sterndu.data.transfer.Socket
 import java.io.IOException
 import java.net.ServerSocket
 

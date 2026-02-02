@@ -1,7 +1,6 @@
 @file:JvmName("Connector")
 package com.sterndu.data.transfer
 
-import com.sterndu.data.transfer.basic.Socket
 import java.net.SocketException
 
 
