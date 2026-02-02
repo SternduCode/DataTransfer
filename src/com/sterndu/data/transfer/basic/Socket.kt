@@ -20,7 +20,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 import java.net.Socket as NetSocket
 
-open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
+open class Socket(val socket: NetSocket = NetSocket(), secureMode: Boolean = false) : DataTransferClient(secureMode) {
 
 	private var logger: Logger = LoggingUtil.getLogger(basicSocket)
 
@@ -43,7 +43,7 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 	 */
 	@Throws(IOException::class)
 	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port))", "import java.net.Socket as NetSocket"))
-	constructor(address: InetAddress, port: Int) : this(NetSocket(address, port))
+	constructor(address: InetAddress, port: Int, secureMode: Boolean = false) : this(NetSocket(address, port), secureMode)
 
 	/**
 	 * Instantiates a new socket.
@@ -56,12 +56,12 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 	 */
 	@Throws(IOException::class)
 	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
-	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int) : this(NetSocket(
+	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(NetSocket(
 		address,
 		port,
 		localAddr,
 		localPort
-	))
+	), secureMode)
 
 	/**
 	 * Instantiates a new socket.
@@ -73,7 +73,7 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 	 */
 	@Throws(IOException::class, UnknownHostException::class)
 	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port))", "import java.net.Socket as NetSocket"))
-	constructor(host: String, port: Int) : this(NetSocket(host, port))
+	constructor(host: String, port: Int, secureMode: Boolean = false) : this(NetSocket(host, port), secureMode)
 
 	/**
 	 * Instantiates a new socket.
@@ -86,12 +86,12 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 	 */
 	@Throws(IOException::class)
 	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port, localAddr, localPort))", "import java.net.Socket as NetSocket"))
-	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int) : this(NetSocket(
+	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(NetSocket(
 		host,
 		port,
 		localAddr,
 		localPort
-	))
+	), secureMode)
 
 	fun initWithHost(host: Boolean) {
 		appendix = "${socket.inetAddress}:${socket.port} -- ${socket.localAddress}:${socket.localPort}".replace("/", "").replace(":", "-")
