@@ -91,10 +91,6 @@ abstract class DataTransferClient: Closeable {
 
 	abstract override fun close()
 
-	internal open fun initWithHost(host: Boolean) {
-		init(host)
-	}
-
 	protected open fun init(host: Boolean){
 		if (logger == null) {
 			logger = LoggingUtil.getLogger(dataTransferClient)

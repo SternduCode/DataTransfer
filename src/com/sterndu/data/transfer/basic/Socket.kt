@@ -93,9 +93,9 @@ open class Socket(val socket: NetSocket = NetSocket()) : DataTransferClient() {
 		localPort
 	))
 
-	override fun initWithHost(host: Boolean) {
+	fun initWithHost(host: Boolean) {
 		appendix = "${socket.inetAddress}:${socket.port} -- ${socket.localAddress}:${socket.localPort}".replace("/", "").replace(":", "-")
-		super.initWithHost(host)
+		super.init(host)
 	}
 
 	override val isClosed: Boolean
