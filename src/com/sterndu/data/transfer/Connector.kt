@@ -5,7 +5,7 @@ import java.net.SocketException
 
 
 class Connector(
-	val sock: Socket,
+	val sock: DataTransferSocket,
 	val type: Byte
 ) {
 

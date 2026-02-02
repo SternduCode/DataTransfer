@@ -15,7 +15,7 @@ import java.util.*
 import java.util.logging.Level
 import java.util.logging.Logger
 
-open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: Boolean = false, host: Boolean = false) : DataTransferClient(secureMode) {
+open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), secureMode: Boolean = false, host: Boolean = false) : DataTransferClient(secureMode) {
 
 	private var logger: Logger = LoggingUtil.getLogger(basicSocket)
 
@@ -267,7 +267,7 @@ open class Socket(val socket: java.net.Socket = java.net.Socket(), secureMode: B
 
 		private const val MAX_PACKET_SIZE = 1_073_741_824 // 2^30
 
-		val allSockets: MutableMap<Socket, Array<StackTraceElement>> = Collections.synchronizedMap(HashMap())
+		val allSockets: MutableMap<DataTransferSocket, Array<StackTraceElement>> = Collections.synchronizedMap(HashMap())
 	}
 
 }
