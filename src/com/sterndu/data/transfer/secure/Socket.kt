@@ -88,10 +88,6 @@ open class Socket : Socket {
 		}
 	}
 
-	private fun removeUpdater(key: String) {
-		Updater.remove(key)
-	}
-
 	/**
 	 * @param host the host
 	 */
@@ -105,11 +101,11 @@ open class Socket : Socket {
 			val lastInitStageTime = AtomicLong(System.currentTimeMillis())
 			Updater.add("InitCheck $appendix") {
                 if (System.currentTimeMillis() - lastInitStageTime.get() > 15000) try {
-                    close()
-                    logger.log(Level.FINE, "${socket.inetAddress} tried to connect! But failed to initialize initCheck $appendix")
-                    removeUpdater("InitCheck $appendix")
-                    Updater.printAll(logger)
-                } catch (e: IOException) {
+					close()
+					logger.log(Level.FINE, "${socket.inetAddress} tried to connect! But failed to initialize initCheck $appendix")
+					Updater.remove("InitCheck $appendix")
+					Updater.printAll(logger)
+				} catch (e: IOException) {
                     logger.log(Level.WARNING, SECURE_SOCKET, e)
                 }
             }
@@ -169,7 +165,7 @@ open class Socket : Socket {
 			crypter = CrypterProvider.getCrypterByCode(li.last())!!
 			crypter!!.makeKey(dH.getSecret()!!)
 			initialized = true
-			removeUpdater("InitCheck $appendix")
+			Updater.remove("InitCheck $appendix")
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, SECURE_SOCKET, e)
 		} catch (e: InvalidKeySpecException) {
@@ -197,7 +193,7 @@ open class Socket : Socket {
 			dH.doPhase(key, true)
 			crypter!!.makeKey(dH.getSecret()!!)
 			initialized = true
-			removeUpdater("InitCheck $appendix")
+			Updater.remove("InitCheck $appendix")
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, SECURE_SOCKET, e)
 		} catch (e: InvalidKeySpecException) {
