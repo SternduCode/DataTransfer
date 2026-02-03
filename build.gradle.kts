@@ -21,7 +21,6 @@ kotlin {
 }
 
 dependencies {
-	implementation(project(":Util"))
 	implementation(project(":Multicore"))
 	implementation(project(":Encryption"))
 	implementation(libs.ktor.serverCore)

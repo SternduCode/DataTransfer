@@ -1,7 +1,6 @@
 package com.sterndu.data.transfer
 
 import com.sterndu.multicore.LoggingUtil
-import com.sterndu.util.readXBytes
 import java.io.File
 import java.io.IOException
 import java.net.InetAddress

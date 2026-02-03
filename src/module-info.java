@@ -3,7 +3,6 @@ module com.sterndu.DataTransfer {
 
 	requires transitive com.sterndu.Encryption;
 	requires transitive com.sterndu.MultiCore;
-	requires com.sterndu.Util;
 	requires kotlin.stdlib;
 	requires java.logging;
 
