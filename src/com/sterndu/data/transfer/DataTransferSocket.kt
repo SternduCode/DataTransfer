@@ -16,7 +16,7 @@ import java.util.logging.Logger
 
 open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), secureMode: Boolean = false, host: Boolean = false) : DataTransferClient(secureMode) {
 
-	private var logger: Logger = LoggingUtil.getLogger(basicSocket)
+	private var logger: Logger = LoggingUtil.getLogger(BASIC_SOCKET)
 
 	override var appendix: String = "uninitialized socket"
 
@@ -175,13 +175,13 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 			delayedSend.add(Packet(type, data))
 			return
 		}
-		if (isClosed) throw SocketException(socketClosed)
+		if (isClosed) throw SocketException(SOCKET_CLOSED)
 		val md = md ?: throw IllegalStateException()
 		var sendStamp = 0L
 		try {
 			sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
 
-			if (isClosed) throw SocketException(socketClosed)
+			if (isClosed) throw SocketException(SOCKET_CLOSED)
 			Files.write(File("./${appendix}_${System.currentTimeMillis()}_${type}${if (raw) "I" else ""}S.pckt").toPath(), data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
 			val modifiedData = if (raw) data else implSendData(type, data)
 			val hash = md.digest(modifiedData)
@@ -200,13 +200,13 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 					close()
 				} catch (ex: IOException) {
 					ex.initCause(e)
-					logger.log(Level.WARNING, basicSocket, ex)
+					logger.log(Level.WARNING, BASIC_SOCKET, ex)
 				}
 				if (e.message != "Broken pipe")
 					throw e
-				else logger.log(Level.FINEST, basicSocket, e)
+				else logger.log(Level.FINEST, BASIC_SOCKET, e)
 			} catch (e: IOException) {
-				logger.log(Level.WARNING, basicSocket, e)
+				logger.log(Level.WARNING, BASIC_SOCKET, e)
 				delayedSend.add(Packet(type, data))
 			}
 		} finally {
@@ -222,8 +222,10 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 	 */
 	@Throws(IOException::class, SocketException::class)
 	override fun close() {
-		if (logger == null)
-			logger = LoggingUtil.getLogger(basicSocket)
+		if (logger == null) {
+			logger = LoggingUtil.getLogger(BASIC_SOCKET)
+			logger.info("FFS needed late init logger")
+		}
 		logger.fine("close $this ${Thread.currentThread().stackTrace.contentToString()}")
 		try {
 			var recvStamp = 0L
@@ -260,9 +262,9 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 
 		private const val MAX_PACKET_AMOUNT_FOR_RESEND = 10
 
-		private const val basicSocket = "Basic Socket"
+		private const val BASIC_SOCKET = "Basic Socket"
 
-		private const val socketClosed = "Socket closed!"
+		private const val SOCKET_CLOSED = "Socket closed!"
 
 		private const val MAX_PACKET_SIZE = 1_073_741_824 // 2^30
 

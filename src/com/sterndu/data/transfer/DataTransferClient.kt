@@ -26,7 +26,7 @@ import kotlin.text.toByteArray
 
 abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
-	private var logger: Logger = LoggingUtil.getLogger(dataTransferClient)
+	private var logger: Logger = LoggingUtil.getLogger(DATA_TRANSFER_CLIENT)
 
 	protected lateinit var dH: DiffieHellman
 
@@ -121,7 +121,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 	protected open fun init(host: Boolean) {
 		if (logger == null) {
-			logger = LoggingUtil.getLogger(dataTransferClient)
+			logger = LoggingUtil.getLogger(DATA_TRANSFER_CLIENT)
 			logger.info("FFS needed late init logger")
 		}
 		try {
@@ -132,7 +132,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 				dH = DiffieHellman()
 			}
 		} catch (e: NoSuchAlgorithmException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		}
 		val lastInitStageTime = AtomicLong(System.currentTimeMillis())
 		setDefaultHandles(lastInitStageTime)
@@ -142,7 +142,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
             try {
                 if (host) startHandshake()
             } catch (e: SocketException) {
-                logger.log(Level.WARNING, dataTransferClient, e)
+                logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
             }
         }
 
@@ -156,7 +156,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 					close()
 				}
 			} catch (e: IOException) {
-				logger.log(Level.WARNING, dataTransferClient, e)
+				logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 			}
 		}
 
@@ -194,7 +194,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 					it(data.type, data.data)
 				} ?: receiveQueue.add(data)
 			} catch (e: IOException) {
-				logger.log(Level.WARNING, dataTransferClient, e)
+				logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 			}
 			if (delayedSend.isNotEmpty() && initialized && !isClosed) {
 				val (type, data) = delayedSend.removeAt(0)
@@ -220,7 +220,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 					Updater.remove("InitCheck $appendix")
 					Updater.printAll(logger)
 				} catch (e: IOException) {
-					logger.log(Level.WARNING, dataTransferClient, e)
+					logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 				}
 			}
 		}
@@ -276,17 +276,17 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			initialized = true
 			Updater.remove("InitCheck $appendix")
 		} catch (e: NoSuchAlgorithmException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidKeySpecException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidAlgorithmParameterException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: SocketException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidKeyException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: Exception) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		}
 	}
 
@@ -304,11 +304,11 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			initialized = true
 			Updater.remove("InitCheck $appendix")
 		} catch (e: NoSuchAlgorithmException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidKeySpecException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidKeyException) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		}
 	}
 
@@ -465,7 +465,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 				false
 			}
 		} catch (e: Exception) {
-			logger.log(Level.WARNING, dataTransferClient, e)
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 			false
 		}
 	}
@@ -473,7 +473,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	companion object {
 		private const val ALREADY_CLOSED = "DataTransferClient Already closed"
 
-		private const val dataTransferClient = "Data Transfer Client"
+		private const val DATA_TRANSFER_CLIENT = "Data Transfer Client"
 	}
 
 }
