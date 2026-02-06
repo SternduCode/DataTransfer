@@ -3,9 +3,7 @@ package com.sterndu.data.transfer
 import com.sterndu.multicore.LoggingUtil
 import java.io.File
 import java.io.IOException
-import java.net.InetAddress
 import java.net.SocketException
-import java.net.UnknownHostException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
@@ -27,67 +25,6 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 			init(host)
 		}
 	}
-
-	/**
-	 * Instantiates a new socket.
-	 *
-	 * @param address the address
-	 * @param port the port
-	 * @throws java.io.IOException Signals that an I/O exception has occurred.
-	 */
-	@Throws(IOException::class)
-	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port))", "java.net.Socket as NetSocket"))
-	constructor(address: InetAddress, port: Int, secureMode: Boolean = false) : this(java.net.Socket(address, port), secureMode)
-
-	/**
-	 * Instantiates a new socket.
-	 *
-	 * @param address the address
-	 * @param port the port
-	 * @param localAddr the local addr
-	 * @param localPort the local port
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 */
-	@Throws(IOException::class)
-	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(address, port, localAddr, localPort))", "java.net.Socket as NetSocket"))
-	constructor(address: InetAddress, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(
-        java.net.Socket(
-            address,
-            port,
-            localAddr,
-            localPort
-        ), secureMode)
-
-	/**
-	 * Instantiates a new socket.
-	 *
-	 * @param host the host
-	 * @param port the port
-	 * @throws java.net.UnknownHostException the unknown host exception
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 */
-	@Throws(IOException::class, UnknownHostException::class)
-	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port))", "java.net.Socket as NetSocket"))
-	constructor(host: String, port: Int, secureMode: Boolean = false) : this(java.net.Socket(host, port), secureMode)
-
-	/**
-	 * Instantiates a new socket.
-	 *
-	 * @param host the host
-	 * @param port the port
-	 * @param localAddr the local addr
-	 * @param localPort the local port
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 */
-	@Throws(IOException::class)
-	@Deprecated("Use Socket(socket: NetSocket) instead", ReplaceWith("Socket(NetSocket(host, port, localAddr, localPort))", "java.net.Socket as NetSocket"))
-	constructor(host: String, port: Int, localAddr: InetAddress, localPort: Int, secureMode: Boolean = false) : this(
-        java.net.Socket(
-            host,
-            port,
-            localAddr,
-            localPort
-        ), secureMode)
 
 	@Deprecated("Use constructor parameter instead")
 	fun initWithHost(host: Boolean) {
