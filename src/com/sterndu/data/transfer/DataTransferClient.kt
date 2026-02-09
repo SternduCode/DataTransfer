@@ -11,6 +11,7 @@ import java.io.File
 import java.io.IOException
 import java.net.SocketException
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import java.security.*
@@ -35,9 +36,6 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		protected set
 
 	protected open var shutdownHook = { _: DataTransferClient -> }
-
-	@JvmField
-	protected var md: MessageDigest? = null
 
 	@JvmField
 	protected val recvLock = Any()
@@ -70,7 +68,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	 * @param data the data
 	 * @return the byte[]
 	 */
-	protected open fun implReceiveData(type: Byte, data: ByteArray): ByteArray {
+	protected open fun implReceiveData(type: Byte, data: ByteArray, authenticatedData: ByteArray): ByteArray {
 		return if (!secureMode) data
 		else {
 			when (type) {
@@ -78,8 +76,8 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 				else -> {
 					val crypter = crypter
 					check(initialized && crypter != null) { "Socket not initialized!" }
-					crypter.decrypt(data)
-				}
+					crypter.decrypt(data) { authenticatedData }
+                }
 			}
 		}
 	}
@@ -91,14 +89,23 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	 * @param data the data
 	 * @return the byte[]
 	 */
-	protected open fun implSendData(type: Byte, data: ByteArray): ByteArray {
+	protected open fun implSendData(type: Byte, data: ByteArray, authenticatedData: ByteArray): ByteArray {
 		return if (!secureMode) data
 		else {
 			val crypter = crypter
 			check(initialized && crypter != null) { "Socket not initialized!" }
 			when (type) {
 				0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte(), (-126).toByte() -> data
-				else -> crypter.encrypt(data)
+				else -> {
+					crypter.encrypt(data) {
+						ByteBuffer.allocate(1 + 4 + authenticatedData.size)
+							.order(ByteOrder.BIG_ENDIAN)
+							.put(type)
+							.putInt(cipher.getOutputSize(data.size))
+							.put(authenticatedData)
+							.array()
+                    }
+                }
 			}
 		}
 	}
@@ -125,7 +132,6 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		}
 		try {
 			isHost = host
-			md = MessageDigest.getInstance("SHA-512/256") // Better performance than SHA-256
 			if (secureMode) {
 				initialized = false
 				dH = DiffieHellman()
@@ -473,6 +479,8 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		private const val ALREADY_CLOSED = "DataTransferClient Already closed"
 
 		private const val DATA_TRANSFER_CLIENT = "Data Transfer Client"
+
+		val NO_AAD_DATA = ByteArray(0)
 	}
 
 }

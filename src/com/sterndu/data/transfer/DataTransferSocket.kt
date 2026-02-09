@@ -51,46 +51,45 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 	 */
 	@Throws(IOException::class)
     override fun receiveData(): Packet {
-        val md = md ?: throw IllegalStateException()
-
-        var packet: Packet
+		// type byte; length int; data byte[];
 		synchronized(recvLock) {
 			var b = ByteArray(5)
-			if (readXBytes(b, socket.inputStream, b.size, 5000)) {
+			return if (readXBytes(b, socket.inputStream, b.size, 5000)) {
 				val type = b[0]
 				val length = ByteBuffer.wrap(b).order(ByteOrder.BIG_ENDIAN).getInt(1)
                 if (length in 0..MAX_PACKET_SIZE) {
-                    b = ByteArray(32)
-                    var data = ByteArray(length)
-                    if (readXBytes(data, socket.inputStream, length, 5000 + length * 10L)
-                        && readXBytes(b, socket.inputStream, b.size, 5000 + 320) && b.contentEquals(md.digest(data))
-                    ) {
-                        packet = Packet(type, data)
-                        if (data.size > 5000) data = data.copyOfRange(0, 5000)
-                        logReceiveState(type, 'r', length, data, b)
-                    } else {
-                        if (data.size > 5000) data = data.copyOfRange(0, 5000)
-                        logReceiveState(type, 'f', length, data, b)
-                        return Packet(((-128).toByte()), ByteArray(0))
-                    }
+                    b = ByteArray(length)
+					if (readXBytes(b, socket.inputStream, length, 5000 + length * 10L)) {
+						val data = b
+						if (b.size > 5000) b = b.copyOfRange(0, 5000)
+						logReceiveState(type, 'r', length, b)
+						val authenticatedData = ByteBuffer.allocate(5)
+							.order(ByteOrder.BIG_ENDIAN)
+							.put(type)
+							.putInt(length)
+							.array()
+						Packet(type, implReceiveData(type, data, authenticatedData))
+					} else {
+						if (b.size > 5000) b = b.copyOfRange(0, 5000)
+						logReceiveState(type, 'f', length, b)
+						Packet(((-128).toByte()), ByteArray(0))
+					}
                 } else {
 					logger.fine("$type f[length: $length]")
-					return Packet(((-128).toByte()), ByteArray(0))
+					Packet(((-128).toByte()), ByteArray(0))
 				}
 			} else {
 				logger.fine("f" + b.contentToString())
-				return Packet(((-128).toByte()), ByteArray(0))
+				Packet(((-128).toByte()), ByteArray(0))
 			}
 		}
-		return Packet(packet.type, implReceiveData(packet.type, packet.data))
-		// type byte; length int; data byte[]; hash byte[32];
 	}
 
-	private fun logReceiveState(type: Byte, state: Char, length: Int, data: ByteArray, hash: ByteArray) {
+	private fun logReceiveState(type: Byte, state: Char, length: Int, data: ByteArray) {
 		if (state == 'r')
-			logger.finest("$type $state[length: $length,data: ${data.contentToString()},hash: ${hash.contentToString()}")
+			logger.finest("$type $state[length: $length,data: ${data.contentToString()}")
 		else
-			logger.fine("$type $state[length: $length,data: ${data.contentToString()},hash: ${hash.contentToString()}")
+			logger.fine("$type $state[length: $length,data: ${data.contentToString()}")
 	}
 
 	/**
@@ -108,21 +107,18 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 			return
 		}
 		if (isClosed) throw SocketException(SOCKET_CLOSED)
-		val md = md ?: throw IllegalStateException()
 		synchronized(sendLock) {
 			if (isClosed) throw SocketException(SOCKET_CLOSED)
 			Files.write(File("./${appendix}_${System.currentTimeMillis()}_${type}${if (raw) "I" else ""}S.pckt").toPath(), data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
-			val modifiedData = if (raw) data else implSendData(type, data)
-			val hash = md.digest(modifiedData)
+			val modifiedData = if (raw) data else implSendData(type, data, NO_AAD_DATA)
 			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
 			try {
 				val os = socket.outputStream
 				os.write(type.toInt())
 				os.write(lengthBytes)
 				os.write(modifiedData)
-				os.write(hash)
 				logger.finest(type.toString() + "${if (raw) "i" else ""}s[length_bytes:" + lengthBytes.contentToString() + ", length:" + modifiedData.size +
-						",data:" + modifiedData.contentToString() + ",hash:" + hash.contentToString()
+							",data:" + modifiedData.contentToString()
 				)
 			} catch (e: SocketException) {
 				try {
