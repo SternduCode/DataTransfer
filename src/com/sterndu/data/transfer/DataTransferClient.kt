@@ -190,21 +190,25 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		}
 	}
 
+	private fun checkForMsgs() {
+		if (!isClosed && isDataAvailable) try {
+			val data = receiveData()
+			Files.write(File("./${appendix}_${System.currentTimeMillis()}_${data.type}.pckt").toPath(), data.data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
+			getHandle(data.type)?.also {
+				it(data.type, data.data)
+			} ?: receiveQueue.add(data)
+		} catch (e: IOException) {
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
+		}
+		if (delayedSend.isNotEmpty() && initialized && !isClosed) {
+			val (type, data) = delayedSend.removeAt(0)
+			sendData(type, data)
+		}
+	}
+
 	private fun setDefaultUpdaterTasks(lastInitStageTime: AtomicLong) {
 		Updater.add("CheckForMsgs $appendix") {
-			if (!isClosed && isDataAvailable) try {
-				val data = receiveData()
-				Files.write(File("./${appendix}_${System.currentTimeMillis()}_${data.type}.pckt").toPath(), data.data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
-				getHandle(data.type)?.also {
-					it(data.type, data.data)
-				} ?: receiveQueue.add(data)
-			} catch (e: IOException) {
-				logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
-			}
-			if (delayedSend.isNotEmpty() && initialized && !isClosed) {
-				val (type, data) = delayedSend.removeAt(0)
-				sendData(type, data)
-			}
+			checkForMsgs()
 		}
 		Updater.add("PingKill $appendix") {
 			if (!isClosed && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
@@ -453,9 +457,11 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		return try {
 			synchronized(this) {
 				val caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).callerClass
-				if (equalsOrNull(handles[type]?.first, caller)) {
+				val (clazz, oldHandle) = handles[type] ?: (null to null)
+				if (equalsOrNull(clazz, caller)) {
+
 					if (handle != null) {
-						if (!handles.containsKey(type)) {
+						if (oldHandle == null) {
 							receiveQueue.removeIf { (type1, data) ->
 								if (type1 == type) {
 									handle(type1, data)
@@ -465,6 +471,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 						}
 						handles[type] = caller to handle
 					} else handles.remove(type)
+
 					return true
 				}
 				false

@@ -109,7 +109,12 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 		if (isClosed) throw SocketException(SOCKET_CLOSED)
 		synchronized(sendLock) {
 			if (isClosed) throw SocketException(SOCKET_CLOSED)
-			Files.write(File("./${appendix}_${System.currentTimeMillis()}_${type}${if (raw) "I" else ""}S.pckt").toPath(), data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
+			Files.write(
+				File("./${appendix}_${System.currentTimeMillis()}_${type}${if (raw) "I" else ""}S.pckt").toPath(),
+				data,
+				StandardOpenOption.CREATE,
+				StandardOpenOption.WRITE
+			) //write content -> appendix_timestamp.pckt
 			val modifiedData = if (raw) data else implSendData(type, data, NO_AAD_DATA)
 			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
 			try {
