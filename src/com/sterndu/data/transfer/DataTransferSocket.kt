@@ -54,10 +54,7 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
         val md = md ?: throw IllegalStateException()
 
         var packet: Packet
-		var recvStamp = 0L
-		try {
-			recvStamp = recvLock.writeLock() // Get an exclusive lock for receiving
-
+		synchronized(recvLock) {
 			var b = ByteArray(5)
 			if (readXBytes(b, socket.inputStream, b.size, 5000)) {
 				val type = b[0]
@@ -84,8 +81,6 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 				logger.fine("f" + b.contentToString())
 				return Packet(((-128).toByte()), ByteArray(0))
 			}
-		} finally {
-			recvLock.unlock(recvStamp)
 		}
 		return Packet(packet.type, implReceiveData(packet.type, packet.data))
 		// type byte; length int; data byte[]; hash byte[32];
@@ -114,10 +109,7 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 		}
 		if (isClosed) throw SocketException(SOCKET_CLOSED)
 		val md = md ?: throw IllegalStateException()
-		var sendStamp = 0L
-		try {
-			sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
-
+		synchronized(sendLock) {
 			if (isClosed) throw SocketException(SOCKET_CLOSED)
 			Files.write(File("./${appendix}_${System.currentTimeMillis()}_${type}${if (raw) "I" else ""}S.pckt").toPath(), data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
 			val modifiedData = if (raw) data else implSendData(type, data)
@@ -146,8 +138,6 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 				logger.log(Level.WARNING, BASIC_SOCKET, e)
 				delayedSend.add(Packet(type, data))
 			}
-		} finally {
-			sendLock.unlock(sendStamp)
 		}
 	}
 
@@ -165,28 +155,21 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 		}
 		logger.fine("close $this ${Thread.currentThread().stackTrace.contentToString()}")
 		try {
-			var recvStamp = 0L
-			var sendStamp = 0L
-
-			try {
-				recvStamp = recvLock.writeLock() // Get an exclusive lock for receiving
-				sendStamp = sendLock.writeLock() // Get an exclusive lock for sending
-
-				try {
-					if (!isClosed) {
-						shutdownHook(this)
-						socket.shutdownOutput()
-						socket.shutdownInput()
-						removeDefaultUpdaterTasks()
-						disablePeriodicPing()
+			synchronized(recvLock) {
+				synchronized(sendLock) {
+					try {
+						if (!isClosed) {
+							shutdownHook(this)
+							socket.shutdownOutput()
+							socket.shutdownInput()
+							removeDefaultUpdaterTasks()
+							disablePeriodicPing()
+							socket.close()
+						}
+					} catch (_: SocketException) {
 						socket.close()
 					}
-				} catch (e: SocketException) {
-					socket.close()
 				}
-			} finally {
-				recvLock.unlock(recvStamp)
-				sendLock.unlock(sendStamp)
 			}
 		} catch (_: NullPointerException) {
             removeDefaultUpdaterTasks()

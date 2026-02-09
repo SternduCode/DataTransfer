@@ -18,7 +18,6 @@ import java.security.spec.InvalidKeySpecException
 import java.security.spec.X509EncodedKeySpec
 import java.util.EmptyStackException
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.locks.StampedLock
 import java.util.logging.Level
 import java.util.logging.Logger
 import kotlin.collections.ArrayDeque
@@ -41,9 +40,9 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	protected var md: MessageDigest? = null
 
 	@JvmField
-	protected var recvLock = StampedLock()
+	protected val recvLock = Any()
 	@JvmField
-	protected var sendLock = StampedLock()
+	protected var sendLock = Any()
 	@JvmField
 	protected var receiveQueue = ArrayDeque<Packet>()
 
