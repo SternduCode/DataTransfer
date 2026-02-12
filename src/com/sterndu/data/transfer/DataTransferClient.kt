@@ -1,9 +1,7 @@
 @file:JvmName("DataTransferClient")
 package com.sterndu.data.transfer
 
-import com.sterndu.encryption.Crypter
-import com.sterndu.encryption.CrypterProvider
-import com.sterndu.encryption.DiffieHellman
+import com.sterndu.encryption.*
 import com.sterndu.multicore.LoggingUtil
 import com.sterndu.multicore.Updater
 import io.ktor.utils.io.core.Closeable
@@ -256,9 +254,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		try {
 			lastInitStageTime.set(System.currentTimeMillis())
 			var bb = ByteBuffer.wrap(data)
-			val keyLength = bb.getInt()
-			val keyData = ByteArray(keyLength)
-			bb[keyData]
+			val keyData = bb.getByteArrayWithLength()
 			val shortBuffer = bb.asShortBuffer()
 			val li: MutableList<Short> = ArrayList()
 			while (shortBuffer.hasRemaining()) li.add(shortBuffer.get())
