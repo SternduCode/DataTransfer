@@ -12,9 +12,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
-import java.security.*
+import java.security.InvalidAlgorithmParameterException
+import java.security.InvalidKeyException
+import java.security.NoSuchAlgorithmException
 import java.security.spec.InvalidKeySpecException
-import java.security.spec.X509EncodedKeySpec
 import java.util.EmptyStackException
 import java.util.concurrent.atomic.AtomicLong
 import java.util.logging.Level
@@ -26,7 +27,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 	private var logger: Logger = LoggingUtil.getLogger(DATA_TRANSFER_CLIENT)
 
-	protected lateinit var dH: DiffieHellman
+	protected lateinit var dH: KeyExchange
 
 	protected var crypter: Crypter? = null
 
@@ -170,6 +171,9 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			setHandle((-3).toByte()) { _: Byte, data: ByteArray ->
 				initPhase2(data, lastInitStageTime)
 			}
+			setHandle((-4).toByte()) { _: Byte, data: ByteArray ->
+				initPhase3(data, lastInitStageTime)
+			}
 		}
 
 		setHandle((-127).toByte()) { _: Byte, data: ByteArray ->
@@ -240,46 +244,65 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 	@Throws(SocketException::class)
 	fun startHandshake() {
+		// PROTOCOL VERSION (major, minor): Byte[2]; KeyExchange ID: Byte; KeyExchange Data: Byte[length, data]; Supported Crypters: Short[data]
 		initialized = false
-		dH.startHandshake()
-		val pubKeyEnc = dH.publicKey?.encoded ?: throw Exception("Initialization failed")
-		val bb = ByteBuffer.allocate(4 + pubKeyEnc.size + 2 * CrypterProvider.availableCrypterCodes.size)
-		bb.putInt(pubKeyEnc.size)
-		bb.put(pubKeyEnc)
-		bb.asShortBuffer().put(CrypterProvider.availableCrypterCodes)
+		val headerData = ByteArray(3)
+		headerData[0] = DataTransferVersion.packedVersion[0]
+		headerData[1] = DataTransferVersion.packedVersion[1]
+		headerData[2] = dH.ID
+		dH.reset()
+		dH.updateAdditionalAuthenticatedData(headerData)
+		val availableCrypterCodes = CrypterProvider.availableCrypterCodes
+		dH.updateAdditionalAuthenticatedData(allocateByteBuffer(availableCrypterCodes.packingSize).putShortArray(availableCrypterCodes).array())
+		val keyExchangeData = dH.startHandshake() ?: error("KeyExchange initialization failed!")
+		val bb = allocateByteBuffer(headerData.packingSize + keyExchangeData.packingSizeWithLength + availableCrypterCodes.packingSize)
+		bb.put(headerData)
+		bb.putByteArrayWithLength(keyExchangeData)
+		bb.putShortArray(availableCrypterCodes)
 		sendRawData((-2).toByte(), bb.array())
 	}
 
 	private fun initPhase1(data: ByteArray, lastInitStageTime: AtomicLong) {
 		try {
 			lastInitStageTime.set(System.currentTimeMillis())
-			var bb = ByteBuffer.wrap(data)
-			val keyData = bb.getByteArrayWithLength()
+			var bb = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
+			val headerData = ByteArray(3)
+            bb[headerData]
+
+			dH.reset()
+			dH.updateAdditionalAuthenticatedData(headerData)
+
+            headerData[0]
+            headerData[1]
+            headerData[2]
+
+			val keyExchangeData = bb.getByteArrayWithLength()
+			val remainingData = ByteArray(bb.remaining())
+			bb.mark()
+			bb[remainingData]
+			dH.updateAdditionalAuthenticatedData(remainingData)
+			bb.reset()
 			val shortBuffer = bb.asShortBuffer()
 			val li: MutableList<Short> = ArrayList()
 			while (shortBuffer.hasRemaining()) li.add(shortBuffer.get())
 			li.retainAll(CrypterProvider.availableCrypterCodes.toSet())
 			li.sort()
 			lastInitStageTime.set(System.currentTimeMillis())
-			if (System.getProperty("debug") == "true") println("FFS2")
-			val kf = KeyFactory.getInstance("X25519")
-			val key = kf.generatePublic(X509EncodedKeySpec(keyData))
-			if (System.getProperty("debug") == "true") println("FFS3 $key")
-			dH.startHandshake()
-			if (System.getProperty("debug") == "true") println("FFS4")
-			dH.doPhase(key, true)
-			if (System.getProperty("debug") == "true") println("FFS5")
+			if (System.getProperty("debug") == "true") println("FFS2 $keyExchangeData")
+			val nextKeyExchangeData = dH.doPhase(keyExchangeData, allocateByteBuffer(SHORT_SIZE).putShort(li.last()).array()) ?: throw Exception("KeyExchange is not fully completed!")
+			if (System.getProperty("debug") == "true") println("FFS3")
 			lastInitStageTime.set(System.currentTimeMillis())
-			val pubKeyEnc = dH.publicKey?.encoded ?: throw Exception("KeyExchange is not fully completed! No PublicKey available")
-			if (System.getProperty("debug") == "true") println("FFS6")
-			bb = ByteBuffer.allocate(2 + pubKeyEnc.size)
+			if (nextKeyExchangeData.isEmpty()) error("An Error occurred during the key exchange process!")
+			if (li.isEmpty()) error("Not supported Cipher found!")
+			if (System.getProperty("debug") == "true") println("FFS4")
+			bb = ByteBuffer.allocate(SHORT_SIZE + nextKeyExchangeData.packingSize)
 			bb.putShort(li.last())
-			bb.put(pubKeyEnc)
+			bb.put(nextKeyExchangeData)
 			sendRawData((-3).toByte(), bb.array())
 			crypter = CrypterProvider.getCrypterByCode(li.last())!!
-			crypter!!.makeKey(dH.getSecret()!!)
-			initialized = true
-			Updater.remove("InitCheck $appendix")
+			if (dH.handshakeDone) {
+				makeKeys(dH.getSecret(EMPTY)!!)
+			}
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidKeySpecException) {
@@ -299,15 +322,21 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		try {
 			lastInitStageTime.set(System.currentTimeMillis())
 			val bb = ByteBuffer.wrap(data)
+			bb.mark()
+			val aad = ByteArray(2)
+			bb[aad]
+			dH.updateAdditionalAuthenticatedData(aad)
+			bb.reset()
 			crypter = CrypterProvider.getCrypterByCode(bb.getShort())!!
 			val keyData = ByteArray(data.size - 2)
 			bb[keyData]
-			val kf = KeyFactory.getInstance("X25519")
-			val key = kf.generatePublic(X509EncodedKeySpec(keyData)) as PublicKey
-			dH.doPhase(key, true)
-			crypter!!.makeKey(dH.getSecret()!!)
-			initialized = true
-			Updater.remove("InitCheck $appendix")
+			val nextKeyExchangeData = dH.doPhase(keyData) ?: error("KeyExchange has failed!")
+
+			if (nextKeyExchangeData.isNotEmpty()) {
+				sendRawData((-4).toByte(), nextKeyExchangeData)
+			}
+
+			makeKeys(dH.getSecret(EMPTY)!!)
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidKeySpecException) {
@@ -315,6 +344,25 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		} catch (e: InvalidKeyException) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		}
+	}
+
+	private fun initPhase3(data: ByteArray, lastInitStageTime: AtomicLong) {
+		try {
+			lastInitStageTime.set(System.currentTimeMillis())
+			makeKeys(dH.getSecret(data)!!)
+		} catch (e: NoSuchAlgorithmException) {
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
+		} catch (e: InvalidKeySpecException) {
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
+		} catch (e: InvalidKeyException) {
+			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
+		}
+	}
+
+	fun makeKeys(masterSecret: ByteArray) {
+		crypter!!.makeKey(masterSecret)
+		initialized = true
+		Updater.remove("InitCheck $appendix")
 	}
 
 	abstract fun name(withClassName: Boolean = false): String
@@ -483,7 +531,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 		private const val DATA_TRANSFER_CLIENT = "Data Transfer Client"
 
-		val NO_AAD_DATA = ByteArray(0)
+		val EMPTY = ByteArray(0)
 	}
 
 }

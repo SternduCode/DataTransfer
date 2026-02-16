@@ -115,7 +115,7 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 				StandardOpenOption.CREATE,
 				StandardOpenOption.WRITE
 			) //write content -> appendix_timestamp.pckt
-			val modifiedData = if (raw) data else implSendData(type, data, NO_AAD_DATA)
+			val modifiedData = if (raw) data else implSendData(type, data, EMPTY)
 			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
 			try {
 				val os = socket.outputStream
