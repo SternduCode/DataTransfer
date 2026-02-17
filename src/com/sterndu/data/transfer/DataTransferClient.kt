@@ -97,10 +97,9 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 				0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte(), (-126).toByte() -> data
 				else -> {
 					crypter.encrypt(data) {
-						ByteBuffer.allocate(1 + 4 + authenticatedData.size)
-							.order(ByteOrder.BIG_ENDIAN)
+						allocateByteBuffer(BYTE_SIZE + INT_SIZE + authenticatedData.size)
 							.put(type)
-							.putInt(cipher.getOutputSize(data.size))
+							.putInt(getOutputPacketSize(data.size))
 							.put(authenticatedData)
 							.array()
                     }
@@ -360,7 +359,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	}
 
 	fun makeKeys(masterSecret: ByteArray) {
-		crypter!!.makeKey(masterSecret)
+		crypter!!.makeKeys(masterSecret, isHost)
 		initialized = true
 		Updater.remove("InitCheck $appendix")
 	}

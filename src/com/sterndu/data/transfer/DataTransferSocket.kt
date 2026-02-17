@@ -1,5 +1,8 @@
 package com.sterndu.data.transfer
 
+import com.sterndu.encryption.BYTE_SIZE
+import com.sterndu.encryption.INT_SIZE
+import com.sterndu.encryption.allocateByteBuffer
 import com.sterndu.multicore.LoggingUtil
 import java.io.File
 import java.io.IOException
@@ -63,8 +66,7 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 						val data = b
 						if (b.size > 5000) b = b.copyOfRange(0, 5000)
 						logReceiveState(type, 'r', length, b)
-						val authenticatedData = ByteBuffer.allocate(5)
-							.order(ByteOrder.BIG_ENDIAN)
+						val authenticatedData = allocateByteBuffer(BYTE_SIZE + INT_SIZE)
 							.put(type)
 							.putInt(length)
 							.array()
