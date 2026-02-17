@@ -27,7 +27,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 	private var logger: Logger = LoggingUtil.getLogger(DATA_TRANSFER_CLIENT)
 
-	protected lateinit var dH: KeyExchange
+	protected lateinit var keyExchange: KeyExchange
 
 	protected var crypter: Crypter? = null
 
@@ -132,7 +132,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			isHost = host
 			if (secureMode) {
 				initialized = false
-				dH = DiffieHellman()
+				keyExchange = DiffieHellman()
 			}
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
@@ -248,12 +248,12 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		val headerData = ByteArray(3)
 		headerData[0] = DataTransferVersion.packedVersion[0]
 		headerData[1] = DataTransferVersion.packedVersion[1]
-		headerData[2] = dH.ID
-		dH.reset()
-		dH.updateAdditionalAuthenticatedData(headerData)
+		headerData[2] = keyExchange.id
+		keyExchange.reset()
+		keyExchange.updateAdditionalAuthenticatedData(headerData)
 		val availableCrypterCodes = CrypterProvider.availableCrypterCodes
-		dH.updateAdditionalAuthenticatedData(allocateByteBuffer(availableCrypterCodes.packingSize).putShortArray(availableCrypterCodes).array())
-		val keyExchangeData = dH.startHandshake() ?: error("KeyExchange initialization failed!")
+		keyExchange.updateAdditionalAuthenticatedData(allocateByteBuffer(availableCrypterCodes.packingSize).putShortArray(availableCrypterCodes).array())
+		val keyExchangeData = keyExchange.startHandshake() ?: error("KeyExchange initialization failed!")
 		val bb = allocateByteBuffer(headerData.packingSize + keyExchangeData.packingSizeWithLength + availableCrypterCodes.packingSize)
 		bb.put(headerData)
 		bb.putByteArrayWithLength(keyExchangeData)
@@ -268,8 +268,8 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			val headerData = ByteArray(3)
             bb[headerData]
 
-			dH.reset()
-			dH.updateAdditionalAuthenticatedData(headerData)
+			keyExchange.reset()
+			keyExchange.updateAdditionalAuthenticatedData(headerData)
 
             headerData[0]
             headerData[1]
@@ -279,7 +279,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			val remainingData = ByteArray(bb.remaining())
 			bb.mark()
 			bb[remainingData]
-			dH.updateAdditionalAuthenticatedData(remainingData)
+			keyExchange.updateAdditionalAuthenticatedData(remainingData)
 			bb.reset()
 			val shortBuffer = bb.asShortBuffer()
 			val li: MutableList<Short> = ArrayList()
@@ -288,7 +288,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			li.sort()
 			lastInitStageTime.set(System.currentTimeMillis())
 			if (System.getProperty("debug") == "true") println("FFS2 $keyExchangeData")
-			val nextKeyExchangeData = dH.doPhase(keyExchangeData, allocateByteBuffer(SHORT_SIZE).putShort(li.last()).array()) ?: throw Exception("KeyExchange is not fully completed!")
+			val nextKeyExchangeData = keyExchange.doPhase(keyExchangeData, allocateByteBuffer(SHORT_SIZE).putShort(li.last()).array()) ?: throw Exception("KeyExchange is not fully completed!")
 			if (System.getProperty("debug") == "true") println("FFS3")
 			lastInitStageTime.set(System.currentTimeMillis())
 			if (nextKeyExchangeData.isEmpty()) error("An Error occurred during the key exchange process!")
@@ -299,8 +299,8 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			bb.put(nextKeyExchangeData)
 			sendRawData((-3).toByte(), bb.array())
 			crypter = CrypterProvider.getCrypterByCode(li.last())!!
-			if (dH.handshakeDone) {
-				makeKeys(dH.getSecret(EMPTY)!!)
+			if (keyExchange.handshakeDone) {
+				makeKeys(keyExchange.getSecret(EMPTY)!!)
 			}
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
@@ -324,18 +324,18 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			bb.mark()
 			val aad = ByteArray(2)
 			bb[aad]
-			dH.updateAdditionalAuthenticatedData(aad)
+			keyExchange.updateAdditionalAuthenticatedData(aad)
 			bb.reset()
 			crypter = CrypterProvider.getCrypterByCode(bb.getShort())!!
 			val keyData = ByteArray(data.size - 2)
 			bb[keyData]
-			val nextKeyExchangeData = dH.doPhase(keyData) ?: error("KeyExchange has failed!")
+			val nextKeyExchangeData = keyExchange.doPhase(keyData) ?: error("KeyExchange has failed!")
 
 			if (nextKeyExchangeData.isNotEmpty()) {
 				sendRawData((-4).toByte(), nextKeyExchangeData)
 			}
 
-			makeKeys(dH.getSecret(EMPTY)!!)
+			makeKeys(keyExchange.getSecret(EMPTY)!!)
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidKeySpecException) {
@@ -348,7 +348,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	private fun initPhase3(data: ByteArray, lastInitStageTime: AtomicLong) {
 		try {
 			lastInitStageTime.set(System.currentTimeMillis())
-			makeKeys(dH.getSecret(data)!!)
+			makeKeys(keyExchange.getSecret(data)!!)
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		} catch (e: InvalidKeySpecException) {
