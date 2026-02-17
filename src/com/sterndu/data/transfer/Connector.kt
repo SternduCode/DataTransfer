@@ -5,7 +5,7 @@ import java.net.SocketException
 
 
 class Connector(
-	val sock: DataTransferSocket,
+	val client: DataTransferClient,
 	val type: Byte
 ) {
 
@@ -33,20 +33,14 @@ class Connector(
 		return packets.size
 	}
 
-	/**
-	 * Disable handle.
-	 */
 	fun disableHandle() {
 		handleDisabled = true
-		sock.setHandle(type, null)
+		client.setHandle(type, null)
 	}
 
-	/**
-	 * Enable handle.
-	 */
 	fun enableHandle() {
 		handleDisabled = false
-		sock.setHandle(type) { _: Byte, data: ByteArray ->
+		client.setHandle(type) { _: Byte, data: ByteArray ->
 			val type = data[0]
 			val dat = ByteArray(data.size - 1)
 			System.arraycopy(data, 1, dat, 0, dat.size)
@@ -62,7 +56,7 @@ class Connector(
 		val send = ByteArray(data.size + 1)
 		send[0] = type
 		System.arraycopy(data, 0, send, 1, data.size)
-		sock.sendData(this.type, send)
+		client.sendData(this.type, send)
 	}
 
 	/**

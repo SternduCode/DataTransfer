@@ -191,7 +191,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		}
 	}
 
-	private fun checkForMsgs() {
+	private fun checkForMessages() {
 		if (!isClosed && isDataAvailable) try {
 			val data = receiveData()
 			Files.write(File("./${appendix}_${System.currentTimeMillis()}_${data.type}.pckt").toPath(), data.data, StandardOpenOption.CREATE, StandardOpenOption.WRITE) //write content -> appendix_timestamp.pckt
@@ -208,8 +208,8 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	}
 
 	private fun setDefaultUpdaterTasks(lastInitStageTime: AtomicLong) {
-		Updater.add("CheckForMsgs $appendix") {
-			checkForMsgs()
+		Updater.add("CheckForMessages $appendix") {
+			checkForMessages()
 		}
 		Updater.add("PingKill $appendix") {
 			if (!isClosed && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
@@ -237,7 +237,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	}
 
 	protected fun removeDefaultUpdaterTasks() {
-		Updater.remove("CheckForMsgs $appendix")
+		Updater.remove("CheckForMessages $appendix")
 		Updater.remove("PingKill $appendix")
 	}
 
@@ -485,10 +485,6 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		if (!isClosed && isConnected) sendRawData((-1).toByte(), ByteArray(0))
 	}
 
-	private fun equalsOrNull(other: Class<*>?, clazz: Class<*>): Boolean {
-		return other == null || clazz == other
-	}
-
 	/**
 	 * Sets the handle.
 	 *
@@ -496,29 +492,27 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	 * @param handle the handle
 	 * @return true, if successful
 	 */
+	@Synchronized
 	fun setHandle(type: Byte, handle: ((Byte, ByteArray) -> Unit)?): Boolean {
 		return try {
-			synchronized(this) {
-				val caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).callerClass
-				val (clazz, oldHandle) = handles[type] ?: (null to null)
-				if (equalsOrNull(clazz, caller)) {
-
-					if (handle != null) {
-						if (oldHandle == null) {
-							receiveQueue.removeIf { (type1, data) ->
-								if (type1 == type) {
-									handle(type1, data)
-									true
-								} else false
-							}
+			val caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).callerClass
+			val (clazz, oldHandle) = handles[type] ?: (null to null)
+			if (clazz == null || caller == clazz) {
+				if (handle != null) {
+					if (oldHandle == null) {
+						receiveQueue.removeIf { (type1, data) ->
+							if (type1 == type) {
+								handle(type1, data)
+								true
+							} else false
 						}
-						handles[type] = caller to handle
-					} else handles.remove(type)
+					}
+					handles[type] = caller to handle
+				} else handles.remove(type)
 
-					return true
-				}
-				false
+				return true
 			}
+			false
 		} catch (e: Exception) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 			false

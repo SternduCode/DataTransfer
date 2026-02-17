@@ -29,10 +29,8 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 		}
 	}
 
-	@Deprecated("Use constructor parameter instead")
-	fun initWithHost(host: Boolean) {
+	fun updateAppendix() {
 		appendix = "${socket.inetAddress}:${socket.port} -- ${socket.localAddress}:${socket.localPort}".replace("/", "").replace(":", "-")
-		super.init(host)
 	}
 
 	override val isClosed: Boolean
@@ -63,17 +61,14 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
                 if (length in 0..MAX_PACKET_SIZE) {
                     b = ByteArray(length)
 					if (readXBytes(b, socket.inputStream, length, 5000 + length * 10L)) {
-						val data = b
-						if (b.size > 5000) b = b.copyOfRange(0, 5000)
-						logReceiveState(type, 'r', length, b)
+						logReceiveState(type, 'r', length, b.copyOfRange(0, 1024.coerceAtMost(b.size)))
 						val authenticatedData = allocateByteBuffer(BYTE_SIZE + INT_SIZE)
 							.put(type)
 							.putInt(length)
 							.array()
-						Packet(type, implReceiveData(type, data, authenticatedData))
+						Packet(type, implReceiveData(type, b, authenticatedData))
 					} else {
-						if (b.size > 5000) b = b.copyOfRange(0, 5000)
-						logReceiveState(type, 'f', length, b)
+						logReceiveState(type, 'f', length, b.copyOfRange(0, 1024.coerceAtMost(b.size)))
 						Packet(((-128).toByte()), ByteArray(0))
 					}
                 } else {
@@ -102,23 +97,23 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 	 * @param raw true, if raw data should be sent
 	 * @throws java.net.SocketException the socket exception
 	 */
-	@Throws(SocketException::class)
+	@Throws(SocketException::class, IllegalStateException::class)
 	override fun sendData(type: Byte, data: ByteArray, raw: Boolean) {
 		if (!raw && !initialized) {
 			delayedSend.add(Packet(type, data))
 			return
 		}
-		if (isClosed) throw SocketException(SOCKET_CLOSED)
+		check(!isClosed) { SOCKET_CLOSED }
 		synchronized(sendLock) {
-			if (isClosed) throw SocketException(SOCKET_CLOSED)
-			Files.write(
+			check(!isClosed) { SOCKET_CLOSED }
+			if (System.getProperty("debug") == "true") Files.write(
 				File("./${appendix}_${System.currentTimeMillis()}_${type}${if (raw) "I" else ""}S.pckt").toPath(),
 				data,
 				StandardOpenOption.CREATE,
 				StandardOpenOption.WRITE
 			) //write content -> appendix_timestamp.pckt
 			val modifiedData = if (raw) data else implSendData(type, data, EMPTY)
-			val lengthBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(modifiedData.size).array()
+			val lengthBytes = allocateByteBuffer(INT_SIZE).putInt(modifiedData.size).array()
 			try {
 				val os = socket.outputStream
 				os.write(type.toInt())
@@ -150,7 +145,7 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 * @throws SocketException the socket exception
 	 */
-	@Throws(IOException::class, SocketException::class)
+	@Throws(IOException::class)
 	override fun close() {
 		if (logger == null) {
 			logger = LoggingUtil.getLogger(BASIC_SOCKET)
@@ -182,8 +177,6 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 	}
 
 	companion object {
-
-		private const val MAX_PACKET_AMOUNT_FOR_RESEND = 10
 
 		private const val BASIC_SOCKET = "Basic Socket"
 
