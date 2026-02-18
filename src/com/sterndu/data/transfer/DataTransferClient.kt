@@ -27,6 +27,8 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 	private var logger: Logger = LoggingUtil.getLogger(DATA_TRANSFER_CLIENT)
 
+	private val lastInitStageTime: AtomicLong = AtomicLong(0)
+
 	protected lateinit var keyExchange: KeyExchange
 
 	protected var crypter: Crypter? = null
@@ -137,9 +139,9 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		} catch (e: NoSuchAlgorithmException) {
 			logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 		}
-		val lastInitStageTime = AtomicLong(System.currentTimeMillis())
-		setDefaultHandles(lastInitStageTime)
-		setDefaultUpdaterTasks(lastInitStageTime)
+		lastInitStageTime.set(System.currentTimeMillis())
+		setDefaultHandles()
+		setDefaultUpdaterTasks()
 
         if (secureMode) {
             try {
@@ -151,7 +153,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
     }
 
-	private fun setDefaultHandles(lastInitStageTime: AtomicLong) {
+	private fun setDefaultHandles() {
 		setHandle((-1).toByte()) { _: Byte, _: ByteArray ->
 			try {
 				if (!isClosed) {
@@ -165,13 +167,13 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 		if (secureMode) {
 			setHandle((-2).toByte()) { _: Byte, data: ByteArray ->
-				initPhase1(data, lastInitStageTime)
+				initPhase1(data)
 			} // Test reduced number of calls && add hashing list avail stuff && add option to disable double hashing
 			setHandle((-3).toByte()) { _: Byte, data: ByteArray ->
-				initPhase2(data, lastInitStageTime)
+				initPhase2(data)
 			}
 			setHandle((-4).toByte()) { _: Byte, data: ByteArray ->
-				initPhase3(data, lastInitStageTime)
+				initPhase3(data)
 			}
 		}
 
@@ -207,7 +209,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		}
 	}
 
-	private fun setDefaultUpdaterTasks(lastInitStageTime: AtomicLong) {
+	private fun setDefaultUpdaterTasks() {
 		Updater.add("CheckForMessages $appendix") {
 			checkForMessages()
 		}
@@ -222,6 +224,10 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 				close()
 			}
 		}
+		enableInitCheck()
+	}
+
+	private fun enableInitCheck() {
 		if (secureMode) {
 			Updater.add("InitCheck $appendix") {
 				if (System.currentTimeMillis() - lastInitStageTime.get() > 15000) try {
@@ -261,7 +267,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		sendRawData((-2).toByte(), bb.array())
 	}
 
-	private fun initPhase1(data: ByteArray, lastInitStageTime: AtomicLong) {
+	private fun initPhase1(data: ByteArray) {
 		try {
 			lastInitStageTime.set(System.currentTimeMillis())
 			var bb = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
@@ -317,7 +323,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		}
 	}
 
-	private fun initPhase2(data: ByteArray, lastInitStageTime: AtomicLong) {
+	private fun initPhase2(data: ByteArray) {
 		try {
 			lastInitStageTime.set(System.currentTimeMillis())
 			val bb = ByteBuffer.wrap(data)
@@ -345,7 +351,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		}
 	}
 
-	private fun initPhase3(data: ByteArray, lastInitStageTime: AtomicLong) {
+	private fun initPhase3(data: ByteArray) {
 		try {
 			lastInitStageTime.set(System.currentTimeMillis())
 			makeKeys(keyExchange.getSecret(data)!!)
@@ -482,7 +488,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	@Throws(SocketException::class)
 	fun sendClose() {
 		logger.log(Level.WARNING, "send close $appendix $this", Exception("send close"))
-		if (!isClosed && isConnected) sendRawData((-1).toByte(), ByteArray(0))
+		if (!isClosed && isConnected) sendRawData((-1).toByte(), EMPTY)
 	}
 
 	/**
