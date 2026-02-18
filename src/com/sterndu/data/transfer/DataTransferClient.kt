@@ -98,13 +98,18 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			when (type) {
 				0.toByte(), (-1).toByte(), (-2).toByte(), (-3).toByte(), (-4).toByte(), (-5).toByte(), (-126).toByte() -> data
 				else -> {
-					crypter.encrypt(data) {
+					val result = crypter.encrypt(data) {
 						allocateByteBuffer(BYTE_SIZE + INT_SIZE + authenticatedData.size)
 							.put(type)
 							.putInt(getOutputPacketSize(data.size))
 							.put(authenticatedData)
 							.array()
                     }
+					if (crypter.shouldGetANewKey()) Updater.add("Rehandshake $appendix") {
+						requestRehandshake()
+						Updater.remove("Rehandshake $appendix")
+					}
+					result
                 }
 			}
 		}
@@ -143,9 +148,9 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		setDefaultHandles()
 		setDefaultUpdaterTasks()
 
-        if (secureMode) {
+        if (secureMode && host) {
             try {
-                if (host) startHandshake()
+                startHandshake()
             } catch (e: SocketException) {
                 logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
             }
@@ -174,6 +179,9 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 			}
 			setHandle((-4).toByte()) { _: Byte, data: ByteArray ->
 				initPhase3(data)
+			}
+			setHandle((-5).toByte()) { _: Byte, _: ByteArray ->
+				startHandshake()
 			}
 		}
 
@@ -247,7 +255,6 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		Updater.remove("PingKill $appendix")
 	}
 
-	@Throws(SocketException::class)
 	fun startHandshake() {
 		// PROTOCOL VERSION (major, minor): Byte[2]; KeyExchange ID: Byte; KeyExchange Data: Byte[length, data]; Supported Crypters: Short[data]
 		initialized = false
@@ -368,6 +375,13 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 		crypter!!.makeKeys(masterSecret, isHost)
 		initialized = true
 		Updater.remove("InitCheck $appendix")
+	}
+
+	fun requestRehandshake() {
+		if (initialized) {
+			initialized = false
+			sendRawData((-5).toByte(), EMPTY)
+		}
 	}
 
 	abstract fun name(withClassName: Boolean = false): String
