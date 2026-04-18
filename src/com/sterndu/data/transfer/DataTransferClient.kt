@@ -3,7 +3,7 @@ package com.sterndu.data.transfer
 
 import com.sterndu.encryption.*
 import com.sterndu.multicore.LoggingUtil
-import com.sterndu.multicore.Updater
+import com.sterndu.multicore.RepeatingTaskHandler
 import io.ktor.utils.io.core.Closeable
 import java.io.File
 import java.io.IOException
@@ -105,9 +105,9 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 							.put(authenticatedData)
 							.array()
                     }
-					if (crypter.shouldGetANewKey()) Updater.add("Rehandshake $appendix") {
+					if (crypter.shouldGetANewKey()) RepeatingTaskHandler.add("Rehandshake $appendix") {
 						requestRehandshake()
-						Updater.remove("Rehandshake $appendix")
+						RepeatingTaskHandler.remove("Rehandshake $appendix")
 					}
 					result
                 }
@@ -218,10 +218,10 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	}
 
 	private fun setDefaultUpdaterTasks() {
-		Updater.add("CheckForMessages $appendix") {
+		RepeatingTaskHandler.add("CheckForMessages $appendix") {
 			checkForMessages()
 		}
-		Updater.add("PingKill $appendix") {
+		RepeatingTaskHandler.add("PingKill $appendix") {
 			if (!isClosed && pingStartTime != 0L && System.currentTimeMillis() - pingStartTime >= 5000) {
 				try {
 					sendClose()
@@ -237,12 +237,12 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 	private fun enableInitCheck() {
 		if (secureMode) {
-			Updater.add("InitCheck $appendix") {
+			RepeatingTaskHandler.add("InitCheck $appendix") {
 				if (System.currentTimeMillis() - lastInitStageTime.get() > 15000) try {
 					close()
 					logger.log(Level.FINE, "${name()} tried to connect! But failed to initialize initCheck $appendix")
-					Updater.remove("InitCheck $appendix")
-					Updater.printAll(logger)
+					RepeatingTaskHandler.remove("InitCheck $appendix")
+					RepeatingTaskHandler.printAll(logger)
 				} catch (e: IOException) {
 					logger.log(Level.WARNING, DATA_TRANSFER_CLIENT, e)
 				}
@@ -251,8 +251,8 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	}
 
 	protected fun removeDefaultUpdaterTasks() {
-		Updater.remove("CheckForMessages $appendix")
-		Updater.remove("PingKill $appendix")
+		RepeatingTaskHandler.remove("CheckForMessages $appendix")
+		RepeatingTaskHandler.remove("PingKill $appendix")
 	}
 
 	fun startHandshake() {
@@ -374,7 +374,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	fun makeKeys(masterSecret: ByteArray) {
 		crypter!!.makeKeys(masterSecret, isHost)
 		initialized = true
-		Updater.remove("InitCheck $appendix")
+		RepeatingTaskHandler.remove("InitCheck $appendix")
 	}
 
 	fun requestRehandshake() {
@@ -395,7 +395,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	abstract fun sendData(type: Byte, data: ByteArray, raw: Boolean = false)
 
 	fun disablePeriodicPing() {
-		Updater.remove("Ping $appendix")
+		RepeatingTaskHandler.remove("Ping $appendix")
 		pingStartTime = 0L
 	}
 
@@ -448,7 +448,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 				sendData((-127).toByte(), "Ping".toByteArray(Charsets.UTF_8))
 			} catch (_: Exception) {
 				logger.finer(ALREADY_CLOSED)
-				Updater.remove("Ping $appendix")
+				RepeatingTaskHandler.remove("Ping $appendix")
 			}
 		}
 	}
@@ -463,13 +463,13 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 				sendRawData((-126).toByte(), "Ping".toByteArray(Charsets.UTF_8))
 			} catch (_: Exception) {
 				logger.finer(ALREADY_CLOSED)
-				Updater.remove("Ping $appendix")
+				RepeatingTaskHandler.remove("Ping $appendix")
 			}
 		}
 	}
 
 	fun setupPeriodicRawPing(millis: Long = 100) {
-		Updater.add("Ping $appendix", millis) {
+		RepeatingTaskHandler.add("Ping $appendix", millis) {
 			if (!isClosed) {
 				if (pingStartTime == 0L) {
 					rawPing() // Potential deadlock
@@ -482,7 +482,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	}
 
 	fun setupPeriodicPing(millis: Long = 100) {
-		Updater.add("Ping $appendix", millis) {
+		RepeatingTaskHandler.add("Ping $appendix", millis) {
 			if (!isClosed) {
 				if (pingStartTime == 0L) {
 					ping() // Potential deadlock
