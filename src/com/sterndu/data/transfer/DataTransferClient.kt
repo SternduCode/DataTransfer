@@ -18,9 +18,11 @@ import java.security.NoSuchAlgorithmException
 import java.security.spec.InvalidKeySpecException
 import java.util.EmptyStackException
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantLock
 import java.util.logging.Level
 import java.util.logging.Logger
 import kotlin.collections.ArrayDeque
+import kotlin.concurrent.withLock
 import kotlin.text.toByteArray
 
 abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
@@ -39,9 +41,9 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	protected open var shutdownHook = { _: DataTransferClient -> }
 
 	@JvmField
-	protected val recvLock = Any()
+	protected val recvLock = ReentrantLock()
 	@JvmField
-	protected var sendLock = Any()
+	protected var sendLock = ReentrantLock()
 	@JvmField
 	protected var receiveQueue = ArrayDeque<Packet>()
 
@@ -55,8 +57,6 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 
 	open var isHost = false
 		protected set
-
-	private val pingLock = Any()
 
 	private val lastPings = ArrayList<Long>()
 
@@ -441,7 +441,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	@Throws(SocketException::class)
 	fun ping() {
 		if (isClosed || !isConnected || !initialized) return
-		synchronized(pingLock) {
+		sendLock.withLock {
 			if (isClosed || !isConnected || !initialized) return
 			pingStartTime = System.currentTimeMillis()
 			try {
@@ -456,7 +456,7 @@ abstract class DataTransferClient(val secureMode: Boolean = true): Closeable {
 	@Throws(SocketException::class)
 	fun rawPing() {
 		if (isClosed || !isConnected || !initialized) return
-		synchronized(pingLock)  {
+		sendLock.withLock {
 			if (isClosed || !isConnected || !initialized) return
 			pingStartTime = System.currentTimeMillis()
 			try {

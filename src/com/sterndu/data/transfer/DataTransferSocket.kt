@@ -14,6 +14,7 @@ import java.nio.file.StandardOpenOption
 import java.util.*
 import java.util.logging.Level
 import java.util.logging.Logger
+import kotlin.concurrent.withLock
 
 open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), secureMode: Boolean = false, host: Boolean = false) : DataTransferClient(secureMode) {
 
@@ -53,7 +54,7 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 	@Throws(IOException::class)
     override fun receiveData(): Packet {
 		// type byte; length int; data byte[];
-		synchronized(recvLock) {
+		recvLock.withLock {
 			var b = ByteArray(5)
 			return if (readXBytes(b, socket.inputStream, b.size, 5000)) {
 				val type = b[0]
@@ -104,7 +105,7 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 			return
 		}
 		check(!isClosed) { SOCKET_CLOSED }
-		synchronized(sendLock) {
+		sendLock.withLock {
 			check(!isClosed) { SOCKET_CLOSED }
 			if (System.getProperty("debug") == "true") Files.write(
 				File("./${appendix}_${System.currentTimeMillis()}_${type}${if (raw) "I" else ""}S.pckt").toPath(),
@@ -153,8 +154,8 @@ open class DataTransferSocket(val socket: java.net.Socket = java.net.Socket(), s
 		}
 		logger.fine("close $this ${Thread.currentThread().stackTrace.contentToString()}")
 		try {
-			synchronized(recvLock) {
-				synchronized(sendLock) {
+			recvLock.withLock {
+				sendLock.withLock {
 					try {
 						if (!isClosed) {
 							shutdownHook(this)
